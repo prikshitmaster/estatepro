@@ -182,7 +182,14 @@ export default function TasksPage() {
           </p>
         </div>
         <button
-          onClick={() => setShowForm((v) => !v)}
+          onClick={() => {
+            if (showForm) {
+              // Closing — reset the form so it opens fresh next time
+              setForm({ lead_id: "", lead_name: "", lead_phone: "", type: "Call", priority: "medium", due_date: "" });
+              setFormError("");
+            }
+            setShowForm((v) => !v);
+          }}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
         >
           <PlusIcon />
