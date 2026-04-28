@@ -2,9 +2,13 @@
 
 import { Lead, Property, Task } from "./types";
 
+// "mock-user" is a placeholder — real data from Supabase will have the actual user id
+const MOCK_USER_ID = "mock-user";
+
 export const mockLeads: Lead[] = [
   {
     id: "1",
+    user_id: MOCK_USER_ID,
     name: "Rahul Sharma",
     phone: "+91 98765 43210",
     email: "rahul@example.com",
@@ -19,6 +23,7 @@ export const mockLeads: Lead[] = [
   },
   {
     id: "2",
+    user_id: MOCK_USER_ID,
     name: "Priya Nair",
     phone: "+91 91234 56789",
     email: "priya@example.com",
@@ -33,6 +38,7 @@ export const mockLeads: Lead[] = [
   },
   {
     id: "3",
+    user_id: MOCK_USER_ID,
     name: "Amit Patel",
     phone: "+91 99887 65432",
     email: "amit@example.com",
@@ -47,6 +53,7 @@ export const mockLeads: Lead[] = [
   },
   {
     id: "4",
+    user_id: MOCK_USER_ID,
     name: "Sunita Joshi",
     phone: "+91 98100 12345",
     email: "sunita@example.com",
@@ -61,6 +68,7 @@ export const mockLeads: Lead[] = [
   },
   {
     id: "5",
+    user_id: MOCK_USER_ID,
     name: "Vikram Mehta",
     phone: "+91 97321 09876",
     email: "vikram@example.com",
@@ -75,6 +83,7 @@ export const mockLeads: Lead[] = [
   },
   {
     id: "6",
+    user_id: MOCK_USER_ID,
     name: "Deepa Menon",
     phone: "+91 96543 21098",
     email: "deepa@example.com",
@@ -89,6 +98,7 @@ export const mockLeads: Lead[] = [
   },
   {
     id: "7",
+    user_id: MOCK_USER_ID,
     name: "Karan Shah",
     phone: "+91 95678 34512",
     email: "karan@example.com",
@@ -106,6 +116,7 @@ export const mockLeads: Lead[] = [
 export const mockProperties: Property[] = [
   {
     id: "1",
+    user_id: MOCK_USER_ID,
     title: "Sea-View 3BHK — Bandra West",
     type: "apartment",
     location: "Bandra West, Mumbai",
@@ -114,6 +125,7 @@ export const mockProperties: Property[] = [
   },
   {
     id: "2",
+    user_id: MOCK_USER_ID,
     title: "Spacious 2BHK — Andheri East",
     type: "apartment",
     location: "Andheri East, Mumbai",
@@ -122,6 +134,7 @@ export const mockProperties: Property[] = [
   },
   {
     id: "3",
+    user_id: MOCK_USER_ID,
     title: "Independent Villa — Lonavala",
     type: "villa",
     location: "Lonavala",
@@ -130,6 +143,7 @@ export const mockProperties: Property[] = [
   },
   {
     id: "4",
+    user_id: MOCK_USER_ID,
     title: "Commercial Shop — Thane",
     type: "commercial",
     location: "Thane West",

@@ -1,92 +1,129 @@
-// app/(dashboard)/leads/new/page.tsx — Add new lead form
+// app/(dashboard)/leads/new/page.tsx — Add Lead form, saves to Supabase
+//
+// 🧠 HOW THIS WORKS:
+//    - User fills in the form fields
+//    - Clicks "Save Lead"
+//    - We send the data to Supabase (addLead function)
+//    - Supabase saves it to the leads table
+//    - We redirect to /leads to see the new lead in the list
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { LeadSource, LeadStage } from "../../../../lib/types";
+import { addLead } from "@/lib/db/leads"; // the function that saves to Supabase
+import { supabase } from "@/lib/supabase";
+import { LeadSource, LeadStage } from "@/lib/types";
 
 export default function NewLeadPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  // One state object holding ALL form fields
+  // This is cleaner than having 9 separate useState calls
   const [form, setForm] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    source: "website" as LeadSource,
-    budget_min: "",
-    budget_max: "",
-    location: "",
-    stage: "new" as LeadStage,
-    notes: "",
+    name:              "",
+    phone:             "",
+    email:             "",
+    source:            "website" as LeadSource,
+    budget_min:        "",
+    budget_max:        "",
+    location:          "",
+    property_interest: "",
+    stage:             "new" as LeadStage,
+    notes:             "",
   });
 
+  // Helper: updates ONE field in the form without touching others
+  // e.g. set("name", "Rahul") → only changes form.name
   function set(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setSaveError("");
     setLoading(true);
-    // TODO: save to Supabase leads table
-    await new Promise((r) => setTimeout(r, 500));
-    // Mock success — go back to leads list
-    router.push("/leads");
+
+    try {
+      // Get the currently logged-in user from Supabase
+      // We need user_id to know WHOSE lead this is
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        // Not logged in — redirect to login
+        router.push("/login");
+        return;
+      }
+
+      // Build the lead object to save
+      // Numbers: parseInt converts the string from the input to a real number
+      await addLead({
+        user_id:           user.id,
+        name:              form.name,
+        phone:             form.phone,
+        email:             form.email,
+        source:            form.source,
+        budget_min:        parseInt(form.budget_min) || 0,
+        budget_max:        parseInt(form.budget_max) || 0,
+        location:          form.location,
+        property_interest: form.property_interest as Lead["property_interest"],
+        stage:             form.stage,
+        notes:             form.notes,
+      });
+
+      // Saved successfully! Go back to the leads list
+      router.push("/leads");
+
+    } catch (err) {
+      // Show the error if save failed
+      setSaveError(err instanceof Error ? err.message : "Failed to save lead.");
+      setLoading(false);
+    }
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      {/* Header */}
+    <div className="p-4 sm:p-6 max-w-2xl mx-auto">
+
+      {/* Header with back button */}
       <div className="flex items-center gap-3 mb-6">
         <Link href="/leads" className="text-gray-400 hover:text-gray-600 transition-colors">
           <BackIcon />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Add Lead</h1>
-          <p className="text-gray-500 text-sm">Fill in the lead&apos;s details</p>
+          <h1 className="text-xl font-bold text-gray-900">Add Lead</h1>
+          <p className="text-gray-400 text-sm">Fill in the lead&apos;s details below</p>
         </div>
       </div>
 
       {/* Form card */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          {/* Name + Phone */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+
+          {/* Row 1: Name + Phone */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Full Name *">
-              <input
-                required
-                type="text"
-                placeholder="Rahul Sharma"
-                value={form.name}
-                onChange={(e) => set("name", e.target.value)}
-                className={inputClass}
-              />
+              <input required type="text" placeholder="Rahul Sharma"
+                value={form.name} onChange={(e) => set("name", e.target.value)}
+                className={input} />
             </Field>
             <Field label="Phone *">
-              <input
-                required
-                type="tel"
-                placeholder="+91 98765 43210"
-                value={form.phone}
-                onChange={(e) => set("phone", e.target.value)}
-                className={inputClass}
-              />
+              <input required type="tel" placeholder="+91 98765 43210"
+                value={form.phone} onChange={(e) => set("phone", e.target.value)}
+                className={input} />
             </Field>
           </div>
 
-          {/* Email + Source */}
+          {/* Row 2: Email + Source */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Email">
-              <input
-                type="email"
-                placeholder="rahul@example.com"
-                value={form.email}
-                onChange={(e) => set("email", e.target.value)}
-                className={inputClass}
-              />
+              <input type="email" placeholder="rahul@example.com"
+                value={form.email} onChange={(e) => set("email", e.target.value)}
+                className={input} />
             </Field>
             <Field label="Source">
-              <select value={form.source} onChange={(e) => set("source", e.target.value)} className={inputClass}>
+              <select value={form.source} onChange={(e) => set("source", e.target.value)} className={input}>
                 <option value="website">Website</option>
                 <option value="referral">Referral</option>
                 <option value="social">Social Media</option>
@@ -97,86 +134,84 @@ export default function NewLeadPage() {
             </Field>
           </div>
 
-          {/* Budget min + max */}
+          {/* Row 3: Budget min + max */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Budget Min (₹)">
-              <input
-                type="number"
-                placeholder="3000000"
-                value={form.budget_min}
-                onChange={(e) => set("budget_min", e.target.value)}
-                className={inputClass}
-              />
+              <input type="number" placeholder="3000000"
+                value={form.budget_min} onChange={(e) => set("budget_min", e.target.value)}
+                className={input} />
             </Field>
             <Field label="Budget Max (₹)">
-              <input
-                type="number"
-                placeholder="8000000"
-                value={form.budget_max}
-                onChange={(e) => set("budget_max", e.target.value)}
-                className={inputClass}
-              />
+              <input type="number" placeholder="8000000"
+                value={form.budget_max} onChange={(e) => set("budget_max", e.target.value)}
+                className={input} />
             </Field>
           </div>
 
-          {/* Location + Stage */}
+          {/* Row 4: Location + Property interest */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Location *">
-              <input
-                required
-                type="text"
-                placeholder="Bandra, Mumbai"
-                value={form.location}
-                onChange={(e) => set("location", e.target.value)}
-                className={inputClass}
-              />
+              <input required type="text" placeholder="Bandra, Mumbai"
+                value={form.location} onChange={(e) => set("location", e.target.value)}
+                className={input} />
             </Field>
-            <Field label="Stage">
-              <select value={form.stage} onChange={(e) => set("stage", e.target.value)} className={inputClass}>
-                <option value="new">New</option>
-                <option value="contacted">Contacted</option>
-                <option value="viewing">Viewing</option>
-                <option value="negotiating">Negotiating</option>
-                <option value="closed">Closed</option>
-                <option value="lost">Lost</option>
+            <Field label="Looking For">
+              <select value={form.property_interest} onChange={(e) => set("property_interest", e.target.value)} className={input}>
+                <option value="">Select type</option>
+                <option value="1BHK">1 BHK</option>
+                <option value="2BHK">2 BHK</option>
+                <option value="3BHK">3 BHK</option>
+                <option value="4BHK">4 BHK</option>
+                <option value="Villa">Villa</option>
+                <option value="Plot">Plot</option>
+                <option value="Commercial">Commercial</option>
               </select>
             </Field>
           </div>
 
-          {/* Notes */}
-          <Field label="Notes">
-            <textarea
-              rows={3}
-              placeholder="Any extra details about this lead..."
-              value={form.notes}
-              onChange={(e) => set("notes", e.target.value)}
-              className={`${inputClass} resize-none`}
-            />
+          {/* Row 5: Stage */}
+          <Field label="Stage">
+            <select value={form.stage} onChange={(e) => set("stage", e.target.value)} className={input}>
+              <option value="new">New</option>
+              <option value="contacted">Contacted</option>
+              <option value="viewing">Viewing</option>
+              <option value="negotiating">Negotiating</option>
+              <option value="closed">Closed</option>
+              <option value="lost">Lost</option>
+            </select>
           </Field>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 sm:flex-none sm:px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-semibold rounded-xl transition-colors"
-            >
+          {/* Notes */}
+          <Field label="Notes">
+            <textarea rows={3} placeholder="Extra details about this lead..."
+              value={form.notes} onChange={(e) => set("notes", e.target.value)}
+              className={`${input} resize-none`} />
+          </Field>
+
+          {/* Error */}
+          {saveError && (
+            <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-xl">{saveError}</p>
+          )}
+
+          {/* Buttons */}
+          <div className="flex gap-3 pt-1">
+            <button type="submit" disabled={loading}
+              className="flex-1 sm:flex-none sm:px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-semibold rounded-xl transition-colors">
               {loading ? "Saving..." : "Save Lead"}
             </button>
-            <Link
-              href="/leads"
-              className="flex-1 sm:flex-none sm:px-8 py-3 text-center border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-xl transition-colors"
-            >
+            <Link href="/leads"
+              className="flex-1 sm:flex-none sm:px-8 py-3 text-center border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-xl transition-colors">
               Cancel
             </Link>
           </div>
+
         </form>
       </div>
     </div>
   );
 }
 
-// Reusable form field wrapper
+// Reusable label + input wrapper — keeps the form DRY (Don't Repeat Yourself)
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -186,8 +221,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const inputClass =
-  "w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white";
+// Shared input class string — one place to change the look of all inputs
+const input =
+  "w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white";
 
 function BackIcon() {
   return (
@@ -196,3 +232,6 @@ function BackIcon() {
     </svg>
   );
 }
+
+// Need this import for the type reference above
+import type { Lead } from "@/lib/types";

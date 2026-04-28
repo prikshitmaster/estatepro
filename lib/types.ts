@@ -8,6 +8,7 @@ export type PropertyInterest = "1BHK" | "2BHK" | "3BHK" | "4BHK" | "Villa" | "Pl
 
 export interface Lead {
   id: string;
+  user_id: string; // which broker this lead belongs to (Supabase user id)
   name: string;
   phone: string;
   email: string;
@@ -27,11 +28,13 @@ export type PropertyStatus = "available" | "sold" | "rented" | "off-market";
 
 export interface Property {
   id: string;
+  user_id: string; // which broker this property belongs to
   title: string;
   type: PropertyType;
   location: string;
   price: number;
   status: PropertyStatus;
+  created_at?: string;
 }
 
 export type TaskType = "Call" | "Site Visit" | "Send Docs" | "Follow Up" | "Negotiation";

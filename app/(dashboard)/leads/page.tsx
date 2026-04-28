@@ -1,52 +1,99 @@
-// app/(dashboard)/leads/page.tsx — Leads list with filter by stage
+// app/(dashboard)/leads/page.tsx — Leads list, fetches REAL data from Supabase
+//
+// 🧠 HOW THIS PAGE WORKS:
+//    - When the page loads → useEffect runs once and fetches all leads from Supabase
+//    - While loading → shows a skeleton (grey boxes)
+//    - After loading → shows the real leads list
+//    - User can filter by stage or search by name/location/phone
+//
+// useEffect = "do this when the page loads"
+// useState  = "remember this value and update the screen when it changes"
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { mockLeads, formatPrice } from "../../../lib/mock-data";
-import { Lead, LeadStage } from "../../../lib/types";
+import { getAllLeads } from "@/lib/db/leads"; // our database function
+import { formatPrice, initials } from "@/lib/mock-data";
+import { Lead, LeadStage } from "@/lib/types";
 
-const stageBadge: Record<LeadStage, string> = {
-  new: "bg-blue-100 text-blue-700",
-  contacted: "bg-yellow-100 text-yellow-700",
-  viewing: "bg-purple-100 text-purple-700",
-  negotiating: "bg-orange-100 text-orange-700",
-  closed: "bg-green-100 text-green-700",
-  lost: "bg-red-100 text-red-700",
+// Colour classes for each stage badge
+const STAGE_STYLE: Record<LeadStage, string> = {
+  new:         "bg-blue-50 text-blue-600",
+  contacted:   "bg-amber-50 text-amber-600",
+  viewing:     "bg-violet-50 text-violet-600",
+  negotiating: "bg-orange-50 text-orange-600",
+  closed:      "bg-green-50 text-green-600",
+  lost:        "bg-red-50 text-red-600",
 };
 
+// Avatar colour palette — cycles through colours based on index
+const AVATAR_COLORS = [
+  "bg-blue-500","bg-violet-500","bg-green-500",
+  "bg-amber-500","bg-rose-500","bg-cyan-500",
+];
+
 const stageFilters: { label: string; value: LeadStage | "all" }[] = [
-  { label: "All", value: "all" },
-  { label: "New", value: "new" },
-  { label: "Contacted", value: "contacted" },
-  { label: "Viewing", value: "viewing" },
+  { label: "All",         value: "all"         },
+  { label: "New",         value: "new"         },
+  { label: "Contacted",   value: "contacted"   },
+  { label: "Viewing",     value: "viewing"     },
   { label: "Negotiating", value: "negotiating" },
-  { label: "Closed", value: "closed" },
-  { label: "Lost", value: "lost" },
+  { label: "Closed",      value: "closed"      },
+  { label: "Lost",        value: "lost"        },
 ];
 
 export default function LeadsPage() {
+  // leads: the list of leads fetched from Supabase
+  const [leads, setLeads]           = useState<Lead[]>([]);
+  // loading: true while we're waiting for Supabase to respond
+  const [loading, setLoading]       = useState(true);
+  // error: holds an error message if fetching fails
+  const [fetchError, setFetchError] = useState("");
+  // search: whatever the user types in the search box
+  const [search, setSearch]         = useState("");
+  // activeStage: the selected stage filter pill
   const [activeStage, setActiveStage] = useState<LeadStage | "all">("all");
-  const [search, setSearch] = useState("");
 
-  const filtered = mockLeads.filter((lead) => {
-    const matchesStage = activeStage === "all" || lead.stage === activeStage;
-    const query = search.toLowerCase();
-    const matchesSearch =
-      !query ||
-      lead.name.toLowerCase().includes(query) ||
-      lead.location.toLowerCase().includes(query) ||
-      lead.phone.includes(query);
+  // useEffect runs this function ONCE when the page first loads
+  // The [] at the end means "only run once on mount, not on every update"
+  useEffect(() => {
+    async function fetchLeads() {
+      try {
+        const data = await getAllLeads(); // call our database function
+        setLeads(data);                  // save the result into state
+      } catch (err) {
+        // If something went wrong, show a message
+        setFetchError("Could not load leads. Check your Supabase setup.");
+        console.error(err);
+      } finally {
+        setLoading(false); // whether it worked or failed, stop showing "loading"
+      }
+    }
+    fetchLeads();
+  }, []); // [] = run once when page loads
+
+  // Filter the leads array based on search text + selected stage
+  // This runs every time `leads`, `search`, or `activeStage` changes
+  const filtered = leads.filter((lead) => {
+    const matchesStage  = activeStage === "all" || lead.stage === activeStage;
+    const q             = search.toLowerCase();
+    const matchesSearch = !q ||
+      lead.name.toLowerCase().includes(q)     ||
+      (lead.location ?? "").toLowerCase().includes(q) ||
+      lead.phone.includes(q);
     return matchesStage && matchesSearch;
   });
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      {/* Header */}
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto">
+
+      {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{mockLeads.length} total leads</p>
+          <h1 className="text-xl font-bold text-gray-900">Leads</h1>
+          <p className="text-sm text-gray-400 mt-0.5">
+            {loading ? "Loading..." : `${leads.length} total leads`}
+          </p>
         </div>
         <Link
           href="/leads/new"
@@ -57,16 +104,23 @@ export default function LeadsPage() {
         </Link>
       </div>
 
-      {/* Search + stage filters */}
+      {/* ── Error message ── */}
+      {fetchError && (
+        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+          {fetchError}
+        </div>
+      )}
+
+      {/* ── Search box + stage filter pills ── */}
       <div className="flex flex-col gap-3 mb-5">
         <input
           type="text"
           placeholder="Search by name, location or phone..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full sm:max-w-sm px-4 py-2.5 rounded-xl border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full sm:max-w-sm px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
         />
-        {/* Stage filter pills — horizontal scroll on mobile */}
+        {/* Filter pills — scroll horizontally on mobile */}
         <div className="flex gap-2 overflow-x-auto pb-1">
           {stageFilters.map((f) => (
             <button
@@ -75,7 +129,7 @@ export default function LeadsPage() {
               className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
                 activeStage === f.value
                   ? "bg-blue-600 text-white"
-                  : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                  : "bg-white border border-gray-200 text-gray-500 hover:bg-gray-50"
               }`}
             >
               {f.label}
@@ -84,39 +138,71 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {/* Leads — table on desktop, cards on mobile */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-16 text-gray-400 text-sm">No leads found.</div>
-      ) : (
+      {/* ── Loading skeleton — shown while Supabase is fetching ── */}
+      {loading && (
+        <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
+          {[...Array(5)].map((_, i) => (
+            // Array(5) creates 5 skeleton rows
+            <div key={i} className="flex items-center gap-3 px-5 py-4 animate-pulse">
+              {/* animate-pulse makes it fade in and out like a loading shimmer */}
+              <div className="w-8 h-8 rounded-full bg-gray-200 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 bg-gray-200 rounded w-1/3" />
+                <div className="h-2.5 bg-gray-100 rounded w-1/2" />
+              </div>
+              <div className="h-5 bg-gray-200 rounded-full w-16" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Empty state ── */}
+      {!loading && filtered.length === 0 && (
+        <div className="text-center py-16 text-gray-400 text-sm">
+          {leads.length === 0
+            ? "No leads yet. Add your first lead!"
+            : "No leads match your search."}
+        </div>
+      )}
+
+      {/* ── Desktop table ── */}
+      {!loading && filtered.length > 0 && (
         <>
-          {/* Desktop table */}
-          <div className="hidden md:block bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-gray-400 uppercase tracking-wider border-b border-gray-100">
-                  <th className="px-6 py-3 font-medium">Lead</th>
-                  <th className="px-6 py-3 font-medium">Location</th>
-                  <th className="px-6 py-3 font-medium">Budget</th>
-                  <th className="px-6 py-3 font-medium">Source</th>
-                  <th className="px-6 py-3 font-medium">Stage</th>
+                <tr className="border-b border-gray-50 text-left">
+                  <th className="px-5 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wide">Lead</th>
+                  <th className="px-4 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wide">Location</th>
+                  <th className="px-4 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wide">Budget</th>
+                  <th className="px-4 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wide">Source</th>
+                  <th className="px-4 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wide">Stage</th>
                 </tr>
               </thead>
-              <tbody>
-                {filtered.map((lead) => (
-                  <tr key={lead.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <Link href={`/leads/${lead.id}`} className="font-medium text-gray-900 hover:text-blue-600">
-                        {lead.name}
-                      </Link>
-                      <div className="text-gray-400 text-xs">{lead.email}</div>
+              <tbody className="divide-y divide-gray-50">
+                {filtered.map((lead, i) => (
+                  <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2.5">
+                        {/* Coloured avatar circle */}
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
+                          {initials(lead.name)}
+                        </div>
+                        <div>
+                          <Link href={`/leads/${lead.id}`} className="font-semibold text-gray-900 hover:text-blue-600 text-sm block">
+                            {lead.name}
+                          </Link>
+                          <span className="text-xs text-gray-400">{lead.email}</span>
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-gray-600">{lead.location}</td>
-                    <td className="px-6 py-4 text-gray-600 text-xs">
+                    <td className="px-4 py-3 text-sm text-gray-500">{lead.location}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">
                       {formatPrice(lead.budget_min)} – {formatPrice(lead.budget_max)}
                     </td>
-                    <td className="px-6 py-4 text-gray-600 capitalize">{lead.source}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${stageBadge[lead.stage]}`}>
+                    <td className="px-4 py-3 text-sm text-gray-500 capitalize">{lead.source}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${STAGE_STYLE[lead.stage]}`}>
                         {lead.stage}
                       </span>
                     </td>
@@ -126,34 +212,33 @@ export default function LeadsPage() {
             </table>
           </div>
 
-          {/* Mobile cards */}
+          {/* ── Mobile cards ── */}
           <div className="md:hidden flex flex-col gap-3">
-            {filtered.map((lead) => (
-              <LeadCard key={lead.id} lead={lead} />
+            {filtered.map((lead, i) => (
+              <Link
+                key={lead.id}
+                href={`/leads/${lead.id}`}
+                className="bg-white rounded-2xl border border-gray-100 p-4 flex items-start justify-between"
+              >
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
+                    {initials(lead.name)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm truncate">{lead.name}</p>
+                    <p className="text-xs text-gray-400">{lead.phone}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{lead.location} · {formatPrice(lead.budget_max)}</p>
+                  </div>
+                </div>
+                <span className={`ml-2 px-2.5 py-1 rounded-full text-xs font-semibold capitalize shrink-0 ${STAGE_STYLE[lead.stage]}`}>
+                  {lead.stage}
+                </span>
+              </Link>
             ))}
           </div>
         </>
       )}
     </div>
-  );
-}
-
-// Mobile card for a single lead
-function LeadCard({ lead }: { lead: Lead }) {
-  return (
-    <Link href={`/leads/${lead.id}`} className="bg-white rounded-2xl border border-gray-200 p-4 flex items-start justify-between hover:bg-gray-50 transition-colors">
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-gray-900 text-sm">{lead.name}</p>
-        <p className="text-gray-400 text-xs mt-0.5">{lead.phone}</p>
-        <p className="text-gray-500 text-xs mt-1">{lead.location}</p>
-        <p className="text-gray-500 text-xs">
-          {formatPrice(lead.budget_min)} – {formatPrice(lead.budget_max)}
-        </p>
-      </div>
-      <span className={`ml-3 px-2.5 py-1 rounded-full text-xs font-medium capitalize shrink-0 ${stageBadge[lead.stage]}`}>
-        {lead.stage}
-      </span>
-    </Link>
   );
 }
 
