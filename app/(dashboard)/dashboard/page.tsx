@@ -8,12 +8,14 @@
 
 import { useEffect, useState, useRef, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getAllLeads, getDashboardStats } from "@/lib/db/leads";
 import { getAllTasks } from "@/lib/db/tasks";
 import { getAllClients } from "@/lib/db/clients";
+import { getAllNewspaperLeads } from "@/lib/db/newspaper-leads";
 import { formatPrice, initials } from "@/lib/mock-data";
-import { Lead, LeadStage, Task, TaskPriority } from "@/lib/types";
+import { Lead, LeadStage, Task, TaskPriority, NewspaperLead } from "@/lib/types";
 
 // ── colour maps ───────────────────────────────────────────────────────────────
 
@@ -40,17 +42,12 @@ const AVATAR_COLORS = [
 // ── page component ────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  // User info from Supabase auth
-  const [userName, setUserName] = useState("");
+  const router = useRouter();
 
-  // Database connection status:
-  //   "checking" → waiting for response
-  //   "connected" → tables exist and working
-  //   "no-tables" → connected but schema.sql not run yet
-  //   "error" → something else went wrong
-  type DBStatus = "checking" | "connected" | "no-tables" | "error";
-  const [dbStatus, setDbStatus] = useState<DBStatus>("checking");
-  const [dbError,  setDbError]  = useState("");
+  const [userName,  setUserName]  = useState("");
+  const [userEmail, setUserEmail] = useState("");
+
+  const [dbConnected, setDbConnected] = useState(false);
 
   // Real stats from Supabase
   const [stats, setStats] = useState({
@@ -63,11 +60,18 @@ export default function DashboardPage() {
   const [todayTasks, setTodayTasks]   = useState<Task[]>([]);
   const [clientCount, setClientCount] = useState(0);
 
-  // Search state — allLeads holds every lead so we can search across all of them
-  const [allLeads, setAllLeads]       = useState<Lead[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchOpen, setSearchOpen]   = useState(false);
-  const searchRef                     = useRef<HTMLDivElement>(null);
+  const [allLeads,       setAllLeads]       = useState<Lead[]>([]);
+  const [searchQuery,    setSearchQuery]    = useState("");
+  const [searchOpen,     setSearchOpen]     = useState(false);
+  const searchRef                           = useRef<HTMLDivElement>(null);
+
+  // Notification bell + profile dropdown state
+  const [notifOpen,      setNotifOpen]      = useState(false);
+  const [profileOpen,    setProfileOpen]    = useState(false);
+  const [newsLeads,      setNewsLeads]      = useState<NewspaperLead[]>([]);
+  const [notifSeen,      setNotifSeen]      = useState(false);
+  const notifRef                            = useRef<HTMLDivElement>(null);
+  const profileRef                          = useRef<HTMLDivElement>(null);
 
   const todayStr = new Date().toLocaleDateString("en-IN", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
@@ -79,24 +83,24 @@ export default function DashboardPage() {
     loadDashboardData();
   }, []);
 
-  // Step 1: get who is logged in
   async function loadUser() {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const name = user.user_metadata?.full_name
-        ?? user.email?.split("@")[0]
-        ?? "there";
+      const name = user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "there";
       setUserName(name);
+      setUserEmail(user.email ?? "");
     }
   }
 
-  // Step 2: try to fetch leads — this tells us if the DB is set up correctly
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
+
   async function loadDashboardData() {
     try {
       const leads = await getAllLeads();
-
-      // If we reach here without an error, the DB tables exist and work!
-      setDbStatus("connected");
+      setDbConnected(true);
 
       // Calculate stats from real data
       const s = await getDashboardStats();
@@ -112,36 +116,30 @@ export default function DashboardPage() {
       const tasks = await getAllTasks();
       setTodayTasks(tasks.filter((t) => !t.completed).slice(0, 5));
 
-      // Load client count — silently ignore if clients table not set up yet
       try {
         const clients = await getAllClients();
         setClientCount(clients.length);
-      } catch {
-        // clients table might not exist yet — that's fine, show 0
-      }
+      } catch { /* clients table might not exist yet */ }
 
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      // Load latest newspaper leads for the notification bell
+      try {
+        const nl = await getAllNewspaperLeads();
+        setNewsLeads(nl.slice(0, 5));
+      } catch { /* newspaper table might not exist yet */ }
 
-      // PostgreSQL error code 42P01 = "table does not exist"
-      // This means the user hasn't run schema.sql in Supabase yet
-      if (message.includes("42P01") || message.includes("does not exist")) {
-        setDbStatus("no-tables");
-      } else {
-        setDbStatus("error");
-        setDbError(message);
-      }
+    } catch {
+      setDbConnected(false);
     }
   }
 
   const pendingTasks = todayTasks;
 
-  // Close search dropdown when clicking outside
+  // Close all dropdowns when clicking outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setSearchOpen(false);
-      }
+      if (searchRef.current  && !searchRef.current.contains(e.target as Node))  setSearchOpen(false);
+      if (notifRef.current   && !notifRef.current.contains(e.target as Node))   setNotifOpen(false);
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
@@ -160,7 +158,7 @@ export default function DashboardPage() {
     : [];
 
   return (
-    <div className="p-4 sm:p-6 space-y-5 max-w-[1280px] mx-auto">
+    <div className="p-4 sm:p-6 space-y-5">
 
       {/* ── Top bar ── */}
       <div className="flex items-center justify-between gap-4">
@@ -226,63 +224,149 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Notification + user avatar */}
+        {/* Notification bell + profile dropdown */}
         <div className="flex items-center gap-2 shrink-0">
-          <button className="relative w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white hover:bg-gray-50">
-            <BellIcon />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />
-          </button>
-          <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-            {userName ? userName.charAt(0).toUpperCase() : "…"}
+
+          {/* ── Bell ── */}
+          <div ref={notifRef} className="relative">
+            <button
+              onClick={() => { setNotifOpen((v) => !v); setProfileOpen(false); setNotifSeen(true); }}
+              className="relative w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
+            >
+              <BellIcon />
+              {newsLeads.length > 0 && !notifSeen && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />
+              )}
+            </button>
+
+            {notifOpen && (
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <p className="text-sm font-bold text-gray-900">Newspaper Leads</p>
+                  <span className="text-[10px] font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                    {newsLeads.length} latest
+                  </span>
+                </div>
+
+                {newsLeads.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-sm text-gray-400">
+                    No newspaper leads yet
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
+                    {newsLeads.map((lead) => (
+                      <Link
+                        key={lead.id}
+                        href="/newspaper"
+                        onClick={() => setNotifOpen(false)}
+                        className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center shrink-0 mt-0.5">
+                          <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">
+                            {lead.bhk} {lead.property_type} — {lead.area}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {lead.city} · {formatPrice(lead.price)}
+                            {lead.owner_type === "owner" && (
+                              <span className="ml-1.5 text-purple-600 font-semibold">🔑 Owner</span>
+                            )}
+                          </p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+
+                <div className="px-4 py-2.5 border-t border-gray-100">
+                  <Link
+                    href="/newspaper"
+                    onClick={() => setNotifOpen(false)}
+                    className="text-xs font-semibold text-purple-600 hover:text-purple-700"
+                  >
+                    View all newspaper leads →
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* ── Profile avatar ── */}
+          <div ref={profileRef} className="relative">
+            <button
+              onClick={() => { setProfileOpen((v) => !v); setNotifOpen(false); }}
+              className="w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-700 flex items-center justify-center text-white text-xs font-bold shrink-0 transition-colors"
+            >
+              {userName ? userName.charAt(0).toUpperCase() : "…"}
+            </button>
+
+            {profileOpen && (
+              <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+                {/* User info */}
+                <div className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-100">
+                  <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                    {userName ? userName.charAt(0).toUpperCase() : "?"}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{userName}</p>
+                    <p className="text-[11px] text-gray-400 truncate">{userEmail}</p>
+                  </div>
+                </div>
+
+                {/* Menu items */}
+                <div className="py-1">
+                  <Link
+                    href="/settings"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Settings
+                  </Link>
+
+                  <Link
+                    href="/newspaper"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                    </svg>
+                    Newspaper Leads
+                  </Link>
+                </div>
+
+                <div className="border-t border-gray-100 py-1">
+                  <button
+                    onClick={handleSignOut}
+                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
 
-      {/* ── Database status banner ─────────────────────────────────────────── */}
-      {/* This shows you EXACTLY what the database connection state is */}
-
-      {dbStatus === "checking" && (
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500 animate-pulse">
-          <span className="w-2 h-2 rounded-full bg-gray-400" />
-          Checking database connection…
-        </div>
-      )}
-
-      {dbStatus === "connected" && (
-        // ✅ Green = tables exist, connection works, data is real
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
-          <span className="w-2 h-2 rounded-full bg-green-500" />
-          <strong>Supabase Connected</strong> — database is live. Data below is real.
-        </div>
-      )}
-
-      {dbStatus === "no-tables" && (
-        // 🟡 Yellow = connected to Supabase but tables don't exist yet
-        // They need to run the schema.sql file
-        <div className="px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
-          <p className="font-semibold mb-1">⚠️ Database tables not found</p>
-          <p>Your Supabase connection works, but the tables haven&apos;t been created yet.</p>
-          <p className="mt-1">
-            Fix: In Supabase → <strong>SQL Editor</strong> → paste the contents of{" "}
-            <code className="bg-amber-100 px-1 rounded">supabase/schema.sql</code> → click Run
-          </p>
-        </div>
-      )}
-
-      {dbStatus === "error" && (
-        // 🔴 Red = something else went wrong
-        <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-          <p className="font-semibold mb-1">❌ Database error</p>
-          <p className="font-mono text-xs">{dbError}</p>
-        </div>
-      )}
 
       {/* ── Stats row ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
 
         <StatCard
           label="New Leads"
-          value={dbStatus === "connected" ? stats.newLeads : "—"}
+          value={dbConnected ? stats.newLeads : "—"}
           accent="blue"
           trend="↑ today"
           icon={<LeadStatIcon />}
@@ -291,7 +375,7 @@ export default function DashboardPage() {
 
         <StatCard
           label="Follow Ups"
-          value={dbStatus === "connected" ? stats.activeFollowUps : "—"}
+          value={dbConnected ? stats.activeFollowUps : "—"}
           accent="amber"
           trend="↑ 8% increase"
           icon={<FollowUpIcon />}
@@ -300,7 +384,7 @@ export default function DashboardPage() {
 
         <StatCard
           label="Active Deals"
-          value={dbStatus === "connected" ? stats.activeDeals : "—"}
+          value={dbConnected ? stats.activeDeals : "—"}
           accent="violet"
           trend="In negotiation"
           icon={<DealIcon />}
@@ -319,7 +403,7 @@ export default function DashboardPage() {
           </div>
           <div className="relative">
             <p className="text-2xl font-bold text-white leading-tight">
-              {dbStatus === "connected"
+              {dbConnected
                 ? formatPrice(Math.round(stats.pipelineValue * 0.02)) // 2% of pipeline
                 : "₹—"}
             </p>
@@ -328,14 +412,14 @@ export default function DashboardPage() {
           <div className="flex items-center gap-1.5 relative">
             <CalendarIcon />
             <span className="text-xs text-blue-100">
-              Pipeline: {dbStatus === "connected" ? formatPrice(stats.pipelineValue) : "—"}
+              Pipeline: {dbConnected ? formatPrice(stats.pipelineValue) : "—"}
             </span>
           </div>
         </div>
       </div>
 
       {/* ── Pipeline Funnel ── */}
-      {dbStatus === "connected" && allLeads.length > 0 && (
+      {dbConnected && allLeads.length > 0 && (
         <PipelineFunnelCard leads={allLeads} />
       )}
 
@@ -352,7 +436,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Loading skeleton */}
-          {dbStatus === "checking" && (
+          {!dbConnected && recentLeads.length === 0 && (
             <div className="divide-y divide-gray-50">
               {[...Array(4)].map((_, i) => (
                 <div key={i} className="flex items-center gap-3 px-5 py-4 animate-pulse">
@@ -368,7 +452,7 @@ export default function DashboardPage() {
           )}
 
           {/* Empty state */}
-          {dbStatus === "connected" && recentLeads.length === 0 && (
+          {dbConnected && recentLeads.length === 0 && (
             <div className="py-12 text-center text-gray-400 text-sm">
               No leads yet.{" "}
               <Link href="/leads/new" className="text-blue-600 hover:underline">Add your first lead →</Link>
@@ -376,7 +460,7 @@ export default function DashboardPage() {
           )}
 
           {/* Desktop table */}
-          {dbStatus === "connected" && recentLeads.length > 0 && (
+          {dbConnected && recentLeads.length > 0 && (
             <>
               <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full">
@@ -449,19 +533,19 @@ export default function DashboardPage() {
           <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
             <div className="px-3 py-3 text-center">
               <p className="text-xl font-bold text-gray-900">
-                {dbStatus === "connected" ? stats.total : "—"}
+                {dbConnected ? stats.total : "—"}
               </p>
               <p className="text-[10px] text-gray-400 mt-0.5">Leads</p>
             </div>
             <div className="px-3 py-3 text-center">
               <p className="text-xl font-bold text-gray-900">
-                {dbStatus === "connected" ? clientCount : "—"}
+                {dbConnected ? clientCount : "—"}
               </p>
               <p className="text-[10px] text-gray-400 mt-0.5">Clients</p>
             </div>
             <div className="px-3 py-3 text-center">
               <p className="text-base font-bold text-gray-900 leading-tight">
-                {dbStatus === "connected" ? formatPrice(stats.pipelineValue) : "—"}
+                {dbConnected ? formatPrice(stats.pipelineValue) : "—"}
               </p>
               <p className="text-[10px] text-gray-400 mt-0.5">Pipeline</p>
             </div>
@@ -473,7 +557,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex flex-col divide-y divide-gray-50 flex-1">
-            {todayTasks.length === 0 && dbStatus === "connected" && (
+            {todayTasks.length === 0 && dbConnected && (
               <p className="text-xs text-gray-400 text-center py-6">No pending tasks.</p>
             )}
             {todayTasks.map((task, i) => (
