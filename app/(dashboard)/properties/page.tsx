@@ -230,12 +230,20 @@ function PropertyCard({ property }: { property: Property }) {
       {/* Price in INR shorthand e.g. ₹1.2Cr */}
       <p className="text-blue-600 font-bold text-base">{formatPrice(property.price)}</p>
 
-      {/* Action buttons — Edit and View Details (full detail pages coming soon) */}
+      {/* Action buttons — coming in next update, shown as disabled so nothing breaks */}
       <div className="flex gap-2 pt-1">
-        <button className="flex-1 py-2 text-xs font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl transition-colors">
+        <button
+          disabled
+          title="Edit — coming soon"
+          className="flex-1 py-2 text-xs font-medium border border-gray-100 text-gray-300 rounded-xl cursor-not-allowed"
+        >
           Edit
         </button>
-        <button className="flex-1 py-2 text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl transition-colors">
+        <button
+          disabled
+          title="View Details — coming soon"
+          className="flex-1 py-2 text-xs font-medium bg-gray-50 text-gray-300 rounded-xl cursor-not-allowed"
+        >
           View Details
         </button>
       </div>

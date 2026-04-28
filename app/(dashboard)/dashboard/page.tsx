@@ -377,9 +377,9 @@ export default function DashboardPage() {
           </div>
 
           <div className="px-4 py-3 border-t border-gray-50">
-            <button className="w-full text-xs text-blue-600 font-medium hover:underline text-center">
+            <Link href="/tasks" className="w-full text-xs text-blue-600 font-medium hover:underline text-center block">
               View all tasks →
-            </button>
+            </Link>
           </div>
         </div>
       </div>
