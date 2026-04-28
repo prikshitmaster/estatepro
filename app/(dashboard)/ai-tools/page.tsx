@@ -22,6 +22,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { getAllLeads } from "@/lib/db/leads";
 import { formatPrice } from "@/lib/mock-data";
 import { Lead, LeadStage } from "@/lib/types";
@@ -231,8 +232,14 @@ export default function AIToolsPage() {
   // ── No leads yet ────────────────────────────────────────────────────────
   if (leads.length === 0) {
     return (
-      <div className="p-6 max-w-3xl mx-auto text-center py-20 text-gray-400 text-sm">
-        No leads found. Add some leads first to use the message generator.
+      <div className="p-6 max-w-3xl mx-auto text-center py-20">
+        <p className="text-gray-400 text-sm mb-3">No leads yet — add one first to use the message generator.</p>
+        <Link
+          href="/leads/new"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
+        >
+          + Add Your First Lead
+        </Link>
       </div>
     );
   }

@@ -11,6 +11,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getAllLeads, getDashboardStats } from "@/lib/db/leads";
 import { getAllTasks } from "@/lib/db/tasks";
+import { getAllClients } from "@/lib/db/clients";
 import { formatPrice, initials } from "@/lib/mock-data";
 import { Lead, LeadStage, Task, TaskPriority } from "@/lib/types";
 
@@ -60,6 +61,7 @@ export default function DashboardPage() {
   // Real recent leads from Supabase
   const [recentLeads, setRecentLeads] = useState<Lead[]>([]);
   const [todayTasks, setTodayTasks]   = useState<Task[]>([]);
+  const [clientCount, setClientCount] = useState(0);
 
   // Search state — allLeads holds every lead so we can search across all of them
   const [allLeads, setAllLeads]       = useState<Lead[]>([]);
@@ -109,6 +111,14 @@ export default function DashboardPage() {
       // Load real tasks (show only pending, max 5)
       const tasks = await getAllTasks();
       setTodayTasks(tasks.filter((t) => !t.completed).slice(0, 5));
+
+      // Load client count — silently ignore if clients table not set up yet
+      try {
+        const clients = await getAllClients();
+        setClientCount(clients.length);
+      } catch {
+        // clients table might not exist yet — that's fine, show 0
+      }
 
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -431,18 +441,24 @@ export default function DashboardPage() {
 
         {/* Today's Tasks */}
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col">
-          <div className="grid grid-cols-2 divide-x divide-gray-100 border-b border-gray-100">
-            <div className="px-4 py-3 text-center">
-              <p className="text-2xl font-bold text-gray-900">
+          <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
+            <div className="px-3 py-3 text-center">
+              <p className="text-xl font-bold text-gray-900">
                 {dbStatus === "connected" ? stats.total : "—"}
               </p>
-              <p className="text-[11px] text-gray-400 mt-0.5">Total Leads</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Leads</p>
             </div>
-            <div className="px-4 py-3 text-center">
-              <p className="text-lg font-bold text-gray-900">
+            <div className="px-3 py-3 text-center">
+              <p className="text-xl font-bold text-gray-900">
+                {dbStatus === "connected" ? clientCount : "—"}
+              </p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Clients</p>
+            </div>
+            <div className="px-3 py-3 text-center">
+              <p className="text-base font-bold text-gray-900 leading-tight">
                 {dbStatus === "connected" ? formatPrice(stats.pipelineValue) : "—"}
               </p>
-              <p className="text-[11px] text-gray-400 mt-0.5">Pipeline Value</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Pipeline</p>
             </div>
           </div>
 

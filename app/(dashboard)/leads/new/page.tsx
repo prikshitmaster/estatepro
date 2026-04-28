@@ -11,9 +11,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { addLead } from "@/lib/db/leads"; // the function that saves to Supabase
+import { addLead } from "@/lib/db/leads";
 import { supabase } from "@/lib/supabase";
-import { LeadSource, LeadStage } from "@/lib/types";
+import { Lead, LeadSource, LeadStage } from "@/lib/types";
 
 export default function NewLeadPage() {
   const router = useRouter();
@@ -84,7 +84,7 @@ export default function NewLeadPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-2xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-2xl mx-auto pb-24 sm:pb-6">
 
       {/* Header with back button */}
       <div className="flex items-center gap-3 mb-6">
@@ -233,5 +233,3 @@ function BackIcon() {
   );
 }
 
-// Need this import for the type reference above
-import type { Lead } from "@/lib/types";

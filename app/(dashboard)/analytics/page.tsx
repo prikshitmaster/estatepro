@@ -26,6 +26,12 @@ import { getAllClients } from "@/lib/db/clients";
 import { formatPrice } from "@/lib/mock-data";
 import { Lead, LeadStage, LeadSource } from "@/lib/types";
 
+// 🧠 WHY Promise.allSettled instead of Promise.all:
+//    Promise.all fails EVERYTHING if ONE request fails.
+//    e.g. if clients table doesn't exist yet → analytics page crashes entirely.
+//    Promise.allSettled lets each request succeed or fail independently.
+//    So if clients table is missing, we still show the leads charts.
+
 // ── Stage display config ──────────────────────────────────────────────────────
 // Maps each stage to a label and bar color
 const STAGE_CONFIG: Record<LeadStage, { label: string; color: string }> = {
@@ -63,16 +69,27 @@ export default function AnalyticsPage() {
   useEffect(() => {
     async function fetchAll() {
       try {
-        // Fetch leads, clients, properties all at the same time (parallel)
-        // Promise.all means: "start all 3 requests, wait for ALL of them to finish"
-        const [leadsData, clientsData, propertiesData] = await Promise.all([
+        // Fetch all three in parallel — allSettled means each one can succeed or
+        // fail independently. If clients table isn't created yet, leads still load.
+        const [leadsResult, clientsResult, propertiesResult] = await Promise.allSettled([
           getAllLeads(),
           getAllClients(),
           getAllProperties(),
         ]);
+
+        // Use the data if the fetch succeeded, otherwise fall back to empty
+        const leadsData      = leadsResult.status      === "fulfilled" ? leadsResult.value      : [];
+        const clientsData    = clientsResult.status    === "fulfilled" ? clientsResult.value    : [];
+        const propertiesData = propertiesResult.status === "fulfilled" ? propertiesResult.value : [];
+
         setLeads(leadsData);
         setClientCount(clientsData.length);
         setPropertyCount(propertiesData.length);
+
+        // Only show error if leads failed too — leads are the core of analytics
+        if (leadsResult.status === "rejected") {
+          setError("Could not load analytics data.");
+        }
       } catch (err) {
         setError("Could not load analytics data.");
         console.error(err);
