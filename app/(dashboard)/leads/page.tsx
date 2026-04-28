@@ -1,22 +1,23 @@
-// app/(dashboard)/leads/page.tsx — Leads list, fetches REAL data from Supabase
+// app/(dashboard)/leads/page.tsx — Leads list with quick stage change
 //
-// 🧠 HOW THIS PAGE WORKS:
-//    - When the page loads → useEffect runs once and fetches all leads from Supabase
-//    - While loading → shows a skeleton (grey boxes)
-//    - After loading → shows the real leads list
-//    - User can filter by stage or search by name/location/phone
+// 🧠 NEW in Day 8:
+//    The stage badge (e.g. "New", "Contacted") is now CLICKABLE.
+//    Clicking it opens a small dropdown — pick a new stage — it saves instantly.
+//    No need to open the edit form just to move a lead forward in the pipeline.
 //
-// useEffect = "do this when the page loads"
-// useState  = "remember this value and update the screen when it changes"
+//    How it works:
+//      1. User clicks stage badge → openStageId is set to that lead's id
+//      2. A dropdown appears with all 6 stage options
+//      3. User picks a stage → updateLead() called → badge updates instantly
+//      4. Clicking anywhere else closes the dropdown (useEffect + click listener)
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { getAllLeads } from "@/lib/db/leads"; // our database function
+import { getAllLeads, updateLead } from "@/lib/db/leads";
 import { formatPrice, initials } from "@/lib/mock-data";
 import { Lead, LeadStage } from "@/lib/types";
 
-// Colour classes for each stage badge
 const STAGE_STYLE: Record<LeadStage, string> = {
   new:         "bg-blue-50 text-blue-600",
   contacted:   "bg-amber-50 text-amber-600",
@@ -26,7 +27,8 @@ const STAGE_STYLE: Record<LeadStage, string> = {
   lost:        "bg-red-50 text-red-600",
 };
 
-// Avatar colour palette — cycles through colours based on index
+const ALL_STAGES: LeadStage[] = ["new", "contacted", "viewing", "negotiating", "closed", "lost"];
+
 const AVATAR_COLORS = [
   "bg-blue-500","bg-violet-500","bg-green-500",
   "bg-amber-500","bg-rose-500","bg-cyan-500",
@@ -43,37 +45,64 @@ const stageFilters: { label: string; value: LeadStage | "all" }[] = [
 ];
 
 export default function LeadsPage() {
-  // leads: the list of leads fetched from Supabase
-  const [leads, setLeads]           = useState<Lead[]>([]);
-  // loading: true while we're waiting for Supabase to respond
-  const [loading, setLoading]       = useState(true);
-  // error: holds an error message if fetching fails
-  const [fetchError, setFetchError] = useState("");
-  // search: whatever the user types in the search box
-  const [search, setSearch]         = useState("");
-  // activeStage: the selected stage filter pill
+  const [leads, setLeads]             = useState<Lead[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [fetchError, setFetchError]   = useState("");
+  const [search, setSearch]           = useState("");
   const [activeStage, setActiveStage] = useState<LeadStage | "all">("all");
 
-  // useEffect runs this function ONCE when the page first loads
-  // The [] at the end means "only run once on mount, not on every update"
+  // openStageId = the lead whose stage dropdown is currently open
+  // null = no dropdown open
+  const [openStageId, setOpenStageId] = useState<string | null>(null);
+
+  // ref to detect clicks outside the dropdown so we can close it
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     async function fetchLeads() {
       try {
-        const data = await getAllLeads(); // call our database function
-        setLeads(data);                  // save the result into state
+        const data = await getAllLeads();
+        setLeads(data);
       } catch (err) {
-        // If something went wrong, show a message
         setFetchError("Could not load leads. Check your Supabase setup.");
         console.error(err);
       } finally {
-        setLoading(false); // whether it worked or failed, stop showing "loading"
+        setLoading(false);
       }
     }
     fetchLeads();
-  }, []); // [] = run once when page loads
+  }, []);
 
-  // Filter the leads array based on search text + selected stage
-  // This runs every time `leads`, `search`, or `activeStage` changes
+  // Close dropdown when user clicks anywhere outside it
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpenStageId(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Called when user picks a new stage from the dropdown
+  // Updates the screen instantly (optimistic) then saves to Supabase
+  async function handleStageChange(leadId: string, newStage: LeadStage) {
+    setOpenStageId(null); // close dropdown immediately
+
+    // Update the lead in our local list right away — feels instant
+    setLeads((prev) =>
+      prev.map((l) => l.id === leadId ? { ...l, stage: newStage } : l)
+    );
+
+    try {
+      await updateLead(leadId, { stage: newStage }); // save to Supabase
+    } catch {
+      // If save failed, re-fetch to restore correct state
+      const fresh = await getAllLeads();
+      setLeads(fresh);
+    }
+  }
+
   const filtered = leads.filter((lead) => {
     const matchesStage  = activeStage === "all" || lead.stage === activeStage;
     const q             = search.toLowerCase();
@@ -87,7 +116,7 @@ export default function LeadsPage() {
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Leads</h1>
@@ -104,14 +133,13 @@ export default function LeadsPage() {
         </Link>
       </div>
 
-      {/* ── Error message ── */}
       {fetchError && (
         <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
           {fetchError}
         </div>
       )}
 
-      {/* ── Search box + stage filter pills ── */}
+      {/* Search + filter */}
       <div className="flex flex-col gap-3 mb-5">
         <input
           type="text"
@@ -120,7 +148,6 @@ export default function LeadsPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-full sm:max-w-sm px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
         />
-        {/* Filter pills — scroll horizontally on mobile */}
         <div className="flex gap-2 overflow-x-auto pb-1">
           {stageFilters.map((f) => (
             <button
@@ -138,13 +165,11 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {/* ── Loading skeleton — shown while Supabase is fetching ── */}
+      {/* Loading skeleton */}
       {loading && (
         <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
           {[...Array(5)].map((_, i) => (
-            // Array(5) creates 5 skeleton rows
             <div key={i} className="flex items-center gap-3 px-5 py-4 animate-pulse">
-              {/* animate-pulse makes it fade in and out like a loading shimmer */}
               <div className="w-8 h-8 rounded-full bg-gray-200 shrink-0" />
               <div className="flex-1 space-y-2">
                 <div className="h-3 bg-gray-200 rounded w-1/3" />
@@ -156,19 +181,17 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* ── Empty state ── */}
+      {/* Empty state */}
       {!loading && filtered.length === 0 && (
         <div className="text-center py-16 text-gray-400 text-sm">
-          {leads.length === 0
-            ? "No leads yet. Add your first lead!"
-            : "No leads match your search."}
+          {leads.length === 0 ? "No leads yet. Add your first lead!" : "No leads match your search."}
         </div>
       )}
 
-      {/* ── Desktop table ── */}
+      {/* Desktop table */}
       {!loading && filtered.length > 0 && (
         <>
-          <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-visible">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-50 text-left">
@@ -184,7 +207,6 @@ export default function LeadsPage() {
                   <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2.5">
-                        {/* Coloured avatar circle */}
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
                           {initials(lead.name)}
                         </div>
@@ -202,9 +224,14 @@ export default function LeadsPage() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500 capitalize">{lead.source}</td>
                     <td className="px-4 py-3">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${STAGE_STYLE[lead.stage]}`}>
-                        {lead.stage}
-                      </span>
+                      {/* ── Clickable stage badge ── */}
+                      <StageBadge
+                        lead={lead}
+                        openStageId={openStageId}
+                        setOpenStageId={setOpenStageId}
+                        onStageChange={handleStageChange}
+                        dropdownRef={dropdownRef}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -212,15 +239,11 @@ export default function LeadsPage() {
             </table>
           </div>
 
-          {/* ── Mobile cards ── */}
+          {/* Mobile cards */}
           <div className="md:hidden flex flex-col gap-3">
             {filtered.map((lead, i) => (
-              <Link
-                key={lead.id}
-                href={`/leads/${lead.id}`}
-                className="bg-white rounded-2xl border border-gray-100 p-4 flex items-start justify-between"
-              >
-                <div className="flex items-start gap-3 flex-1 min-w-0">
+              <div key={lead.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-start justify-between">
+                <Link href={`/leads/${lead.id}`} className="flex items-start gap-3 flex-1 min-w-0">
                   <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
                     {initials(lead.name)}
                   </div>
@@ -229,14 +252,94 @@ export default function LeadsPage() {
                     <p className="text-xs text-gray-400">{lead.phone}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{lead.location} · {formatPrice(lead.budget_max)}</p>
                   </div>
-                </div>
-                <span className={`ml-2 px-2.5 py-1 rounded-full text-xs font-semibold capitalize shrink-0 ${STAGE_STYLE[lead.stage]}`}>
-                  {lead.stage}
-                </span>
-              </Link>
+                </Link>
+                {/* Clickable stage badge on mobile too */}
+                <StageBadge
+                  lead={lead}
+                  openStageId={openStageId}
+                  setOpenStageId={setOpenStageId}
+                  onStageChange={handleStageChange}
+                  dropdownRef={dropdownRef}
+                />
+              </div>
             ))}
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+// ── Stage badge with dropdown ─────────────────────────────────────────────────
+//
+// 🧠 WHAT THIS COMPONENT DOES:
+//    Shows the current stage as a coloured badge (e.g. "New" in blue).
+//    When clicked, opens a dropdown showing all 6 stages.
+//    Picking a stage calls onStageChange() → saves to Supabase instantly.
+//
+// It's a separate component to keep the main page clean.
+function StageBadge({
+  lead, openStageId, setOpenStageId, onStageChange, dropdownRef,
+}: {
+  lead: Lead;
+  openStageId: string | null;
+  setOpenStageId: (id: string | null) => void;
+  onStageChange: (id: string, stage: LeadStage) => void;
+  dropdownRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const isOpen = openStageId === lead.id;
+
+  return (
+    <div className="relative shrink-0" ref={isOpen ? dropdownRef : undefined}>
+
+      {/* The badge itself — clicking opens/closes the dropdown */}
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpenStageId(isOpen ? null : lead.id);
+        }}
+        className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize flex items-center gap-1 ${STAGE_STYLE[lead.stage]}`}
+      >
+        {lead.stage}
+        {/* Small arrow icon to hint it's clickable */}
+        <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Dropdown — only shown when isOpen is true */}
+      {isOpen && (
+        <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[130px]">
+          {ALL_STAGES.map((stage) => (
+            <button
+              key={stage}
+              onClick={(e) => {
+                e.stopPropagation();
+                onStageChange(lead.id, stage);
+              }}
+              className={`w-full text-left px-3 py-2 text-xs font-medium capitalize flex items-center gap-2 hover:bg-gray-50 transition-colors ${
+                lead.stage === stage ? "text-blue-600" : "text-gray-700"
+              }`}
+            >
+              {/* Dot indicator */}
+              <span className={`w-2 h-2 rounded-full shrink-0 ${
+                stage === "new" ? "bg-blue-400" :
+                stage === "contacted" ? "bg-amber-400" :
+                stage === "viewing" ? "bg-violet-400" :
+                stage === "negotiating" ? "bg-orange-400" :
+                stage === "closed" ? "bg-green-400" : "bg-red-400"
+              }`} />
+              {stage}
+              {/* Tick on current stage */}
+              {lead.stage === stage && (
+                <svg className="w-3 h-3 ml-auto text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
