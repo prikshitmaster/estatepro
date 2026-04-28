@@ -46,6 +46,19 @@ function isToday(dateStr: string): boolean {
   return d.getDate() === t.getDate() && d.getMonth() === t.getMonth() && d.getFullYear() === t.getFullYear();
 }
 
+function toLocalDateStr(dateStr: string): string {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function formatDateLabel(dateStr: string): string {
+  const today = toLocalDateStr(new Date().toISOString());
+  const yest  = toLocalDateStr(new Date(Date.now() - 86400000).toISOString());
+  if (dateStr === today) return "Today";
+  if (dateStr === yest)  return "Yesterday";
+  return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
 function whatsappText(lead: NewspaperLead): string {
   const ownerLabel = lead.owner_type === "owner" ? "🔑 Owner Direct" : lead.owner_type === "broker" ? "Via Broker" : "";
   return `🏠 *${lead.bhk} ${lead.property_type}* — ${lead.area}, ${lead.city}
@@ -328,6 +341,7 @@ export default function NewspaperPage() {
 
   // Filters
   const [search,      setSearch]      = useState("");
+  const [dateFilter,  setDateFilter]  = useState(() => toLocalDateStr(new Date().toISOString())); // default today
   const [cityFilter,  setCityFilter]  = useState("all");
   const [intentFilter,setIntentFilter]= useState("all");
   const [bhkFilter,   setBhkFilter]   = useState("all");
@@ -368,6 +382,16 @@ export default function NewspaperPage() {
     return Array.from(set).sort();
   }, [leads]);
 
+  // Available upload dates — newest first, with per-date lead count
+  const availableDates = useMemo(() => {
+    const map: Record<string, number> = {};
+    leads.forEach((l) => {
+      const key = toLocalDateStr(l.uploaded_at);
+      map[key] = (map[key] || 0) + 1;
+    });
+    return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [leads]);
+
   // KPI computations
   const totalLeads  = leads.length;
   const ownerLeads  = leads.filter((l) => l.owner_type === "owner").length;
@@ -378,6 +402,7 @@ export default function NewspaperPage() {
   // Apply all filters
   const filtered = useMemo(() => {
     return leads.filter((l) => {
+      if (dateFilter !== "all" && toLocalDateStr(l.uploaded_at) !== dateFilter) return false;
       if (savedOnly && !actions[l.id]?.is_saved) return false;
       if (cityFilter !== "all" && l.city !== cityFilter) return false;
       if (intentFilter !== "all" && l.intent !== intentFilter) return false;
@@ -395,7 +420,7 @@ export default function NewspaperPage() {
       }
       return true;
     });
-  }, [leads, actions, search, cityFilter, intentFilter, bhkFilter, ownerFilter, savedOnly]);
+  }, [leads, actions, search, dateFilter, cityFilter, intentFilter, bhkFilter, ownerFilter, savedOnly]);
 
   // Handle user action on a lead (contacted / saved)
   async function handleAction(
@@ -523,6 +548,42 @@ export default function NewspaperPage() {
 
       {/* ── Filter bar ── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4 flex flex-col gap-3">
+
+        {/* Date pills — one per upload batch, newest first */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mr-1">Date</span>
+          <button
+            onClick={() => setDateFilter("all")}
+            className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+              dateFilter === "all" ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            All Dates
+          </button>
+          {availableDates.map(([date, count]) => (
+            <button
+              key={date}
+              onClick={() => setDateFilter(date)}
+              className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                dateFilter === date ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {formatDateLabel(date)}
+              <span className={`text-[10px] font-bold rounded-full px-1 ${
+                dateFilter === date ? "bg-white/20 text-white" : "bg-gray-200 text-gray-500"
+              }`}>
+                {count}
+              </span>
+            </button>
+          ))}
+          {/* Manual date picker for any specific date */}
+          <input
+            type="date"
+            value={dateFilter === "all" ? "" : dateFilter}
+            onChange={(e) => e.target.value ? setDateFilter(e.target.value) : setDateFilter("all")}
+            className="ml-auto px-3 py-1 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white text-gray-600"
+          />
+        </div>
 
         {/* Search + dropdowns */}
         <div className="flex flex-wrap gap-2">
