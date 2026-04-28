@@ -54,6 +54,56 @@ export interface Client {
   created_at?: string;
 }
 
+// ── Newspaper Lead types ──────────────────────────────────────────────────────
+
+export type NewspaperLeadIntent     = "sale" | "rent";
+export type NewspaperLeadOwnerType  = "owner" | "broker" | "unknown";
+export type NewspaperSourceType     = "json" | "csv" | "pdf";
+
+export interface NewspaperLead {
+  id: string;
+  source_file_name: string;
+  source_type: NewspaperSourceType;
+  newspaper_name: string;
+  city: string;
+  area: string;
+  property_type: string;
+  bhk: string;
+  intent: NewspaperLeadIntent;
+  price: number;
+  phone: string;
+  owner_type: NewspaperLeadOwnerType;
+  description: string;
+  is_active: boolean;
+  uploaded_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NewspaperLeadAction {
+  id: string;
+  user_id: string;
+  newspaper_lead_id: string;
+  is_saved: boolean;
+  is_contacted: boolean;
+  is_converted: boolean;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NewspaperUpload {
+  id: string;
+  file_name: string;
+  source_type: NewspaperSourceType;
+  lead_count: number;
+  uploaded_by: string;
+  notes: string;
+  uploaded_at: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type TaskType = "Call" | "Site Visit" | "Send Docs" | "Follow Up" | "Negotiation";
 
 export type TaskPriority = "high" | "medium" | "low";

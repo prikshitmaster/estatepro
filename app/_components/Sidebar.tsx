@@ -12,13 +12,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: DashboardIcon },
-  { label: "Leads",     href: "/leads",     icon: LeadsIcon     },
-  { label: "Properties",href: "/properties",icon: PropertiesIcon},
-  { label: "Clients",   href: "/clients",   icon: ClientsIcon   },
-  { label: "Tasks",     href: "/tasks",     icon: TasksIcon     },
-  { label: "Analytics", href: "/analytics", icon: AnalyticsIcon },
-  { label: "AI Tools",  href: "/ai-tools",  icon: AIIcon        },
+  { label: "Dashboard",        href: "/dashboard",  icon: DashboardIcon  },
+  { label: "Leads",            href: "/leads",      icon: LeadsIcon      },
+  { label: "Properties",       href: "/properties", icon: PropertiesIcon },
+  { label: "Clients",          href: "/clients",    icon: ClientsIcon    },
+  { label: "Tasks",            href: "/tasks",      icon: TasksIcon      },
+  { label: "Analytics",        href: "/analytics",  icon: AnalyticsIcon  },
+  { label: "AI Tools",         href: "/ai-tools",   icon: AIIcon         },
+  { label: "Newspaper Leads",  href: "/newspaper",  icon: NewspaperIcon  },
 ];
 
 // Returns the first 2 initials from a name e.g. "Jay Patel" → "JP"
@@ -35,9 +36,10 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router   = useRouter();
 
-  // userName and userEmail start empty — filled in once Supabase responds
-  const [userName,  setUserName]  = useState("");
-  const [userEmail, setUserEmail] = useState("");
+  const [userName,    setUserName]    = useState("");
+  const [userEmail,   setUserEmail]   = useState("");
+  // Today's newspaper lead count — shows as a badge on the nav item
+  const [todayCount,  setTodayCount]  = useState(0);
 
   // Runs once when the sidebar first appears on screen
   // Asks Supabase "who is currently logged in?"
@@ -55,6 +57,16 @@ export default function Sidebar() {
       }
     }
     loadUser();
+
+    // Count today's newspaper leads for the sidebar badge
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    supabase
+      .from("newspaper_leads")
+      .select("id", { count: "exact", head: true })
+      .eq("is_active", true)
+      .gte("uploaded_at", todayStart.toISOString())
+      .then(({ count }) => { if (count) setTodayCount(count); });
   }, []); // [] means run once on load, not on every re-render
 
   // Called when the user clicks "Sign out"
@@ -93,7 +105,13 @@ export default function Sidebar() {
               }`}
             >
               <Icon active={active} />
-              {label}
+              <span className="flex-1">{label}</span>
+              {/* Today's newspaper leads badge — shows how many fresh leads arrived today */}
+              {href === "/newspaper" && todayCount > 0 && (
+                <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none">
+                  {todayCount > 99 ? "99+" : todayCount}
+                </span>
+              )}
             </Link>
           );
         })}
@@ -174,6 +192,9 @@ function AIIcon({ active }: { active: boolean }) {
 }
 function SettingsIcon({ active }: { active: boolean }) {
   return <svg className={`w-4 h-4 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
+}
+function NewspaperIcon({ active }: { active: boolean }) {
+  return <svg className={`w-4 h-4 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>;
 }
 function LogoutIcon() {
   return <svg className="w-4 h-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>;
