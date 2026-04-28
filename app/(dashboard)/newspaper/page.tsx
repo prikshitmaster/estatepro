@@ -611,8 +611,8 @@ export default function NewspaperPage() {
 
       {/* ── TABLE VIEW ── */}
       {viewMode === "table" && filtered.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <div className="overflow-x-auto rounded-2xl">
             <table className="w-full text-sm min-w-[860px]">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">

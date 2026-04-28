@@ -80,7 +80,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="flex flex-col w-56 min-h-screen bg-white border-r border-gray-100 shrink-0">
+    <aside className="flex flex-col w-56 h-screen sticky top-0 bg-white border-r border-gray-100 shrink-0 overflow-y-auto">
 
       {/* ── Brand ── */}
       <div className="flex items-center gap-2.5 px-4 py-5">
