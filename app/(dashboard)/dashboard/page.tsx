@@ -6,7 +6,7 @@
 //   3. Load real lead counts
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getAllLeads, getDashboardStats } from "@/lib/db/leads";
@@ -334,6 +334,11 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* ── Pipeline Funnel ── */}
+      {dbStatus === "connected" && allLeads.length > 0 && (
+        <PipelineFunnelCard leads={allLeads} />
+      )}
+
       {/* ── Main content: Leads + Tasks ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
@@ -484,6 +489,81 @@ export default function DashboardPage() {
         </div>
       </div>
 
+    </div>
+  );
+}
+
+// ── Pipeline Funnel Card ──────────────────────────────────────────────────────
+
+const FUNNEL_STAGES = [
+  { stage: "new",         label: "New",         bar: "bg-blue-500",    text: "text-blue-600"    },
+  { stage: "contacted",   label: "Contacted",   bar: "bg-amber-500",   text: "text-amber-600"   },
+  { stage: "viewing",     label: "Viewing",     bar: "bg-violet-500",  text: "text-violet-600"  },
+  { stage: "negotiating", label: "Negotiating", bar: "bg-orange-500",  text: "text-orange-600"  },
+  { stage: "closed",      label: "Won ✓",       bar: "bg-emerald-500", text: "text-emerald-600" },
+] as const;
+
+function PipelineFunnelCard({ leads }: { leads: Lead[] }) {
+  const pipeline = useMemo(() => FUNNEL_STAGES.map((s) => ({
+    ...s,
+    count: leads.filter((l) => l.stage === s.stage).length,
+  })), [leads]);
+
+  const topCount = Math.max(...pipeline.map((p) => p.count), 1);
+  const total    = leads.length;
+  const closed   = pipeline.find((p) => p.stage === "closed")?.count ?? 0;
+  const convRate = total > 0 ? Math.round((closed / total) * 100) : 0;
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="font-semibold text-gray-900 text-sm">Conversion Funnel</h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {total} total leads
+            <span className="mx-1.5 text-gray-200">·</span>
+            <span className="font-semibold text-emerald-600">{convRate}% close rate</span>
+          </p>
+        </div>
+        <Link href="/analytics" className="text-xs text-blue-600 hover:underline font-medium">
+          Full analytics →
+        </Link>
+      </div>
+
+      {/* Funnel bars */}
+      <div className="flex flex-col gap-3">
+        {pipeline.map(({ stage, label, bar, text, count }) => {
+          const barWidth  = Math.round((count / topCount) * 100);
+          const pctOfAll  = total > 0 ? Math.round((count / total) * 100) : 0;
+          return (
+            <div key={stage} className="flex items-center gap-3">
+              <p className={`text-[11px] font-bold w-[88px] shrink-0 ${text}`}>{label}</p>
+              <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${bar} transition-all duration-700`}
+                  style={{ width: `${barWidth}%` }}
+                />
+              </div>
+              <div className="flex items-baseline gap-1.5 shrink-0 w-14 justify-end">
+                <span className="text-sm font-bold text-gray-800">{count}</span>
+                <span className="text-[10px] text-gray-400">{pctOfAll}%</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Drop-off hint */}
+      {pipeline[0].count > 0 && pipeline[4].count === 0 && (
+        <p className="text-[11px] text-amber-600 mt-3 bg-amber-50 px-3 py-2 rounded-lg">
+          💡 No closed deals yet — keep pushing leads through the pipeline.
+        </p>
+      )}
+      {convRate >= 20 && (
+        <p className="text-[11px] text-emerald-600 mt-3 bg-emerald-50 px-3 py-2 rounded-lg">
+          🎯 Strong {convRate}% close rate — top quartile for real estate brokers.
+        </p>
+      )}
     </div>
   );
 }

@@ -55,6 +55,41 @@ function whatsappText(lead: NewspaperLead): string {
 _Shared via EstatePro CRM_`;
 }
 
+// ─── City Distribution Chart ─────────────────────────────────────────────────
+
+function CityChart({ leads }: { leads: NewspaperLead[] }) {
+  const breakdown = useMemo(() => {
+    const counts: Record<string, number> = {};
+    leads.forEach((l) => { if (l.city) counts[l.city] = (counts[l.city] || 0) + 1; });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 7);
+  }, [leads]);
+
+  const max = breakdown[0]?.[1] || 1;
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 mb-4">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-gray-900">Leads by City</h3>
+        <span className="text-[11px] text-gray-400">{breakdown.length} cities</span>
+      </div>
+      <div className="flex flex-col gap-3">
+        {breakdown.map(([city, count]) => (
+          <div key={city} className="flex items-center gap-3">
+            <p className="text-[12px] font-semibold text-gray-600 w-24 shrink-0 truncate">{city}</p>
+            <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+              <div
+                className="h-full bg-purple-500 rounded-full transition-all duration-700"
+                style={{ width: `${(count / max) * 100}%` }}
+              />
+            </div>
+            <span className="text-xs font-bold text-gray-700 shrink-0 w-6 text-right">{count}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
 
 function KpiCard({ label, value, sub, accent }: { label: string; value: number | string; sub?: string; accent?: string }) {
@@ -297,8 +332,9 @@ export default function NewspaperPage() {
   const [intentFilter,setIntentFilter]= useState("all");
   const [bhkFilter,   setBhkFilter]   = useState("all");
   const [ownerFilter, setOwnerFilter] = useState("all");
-  const [viewMode,    setViewMode]    = useState<"table" | "card">("table");
-  const [savedOnly,   setSavedOnly]   = useState(false);
+  const [viewMode,     setViewMode]    = useState<"table" | "card">("table");
+  const [savedOnly,    setSavedOnly]   = useState(false);
+  const [convertingId, setConvertingId]= useState<string | null>(null);
 
   // Load everything on mount
   useEffect(() => {
@@ -374,13 +410,29 @@ export default function NewspaperPage() {
     await upsertUserAction(userId, lead.id, updates);
   }
 
-  // Handle convert to CRM
+  // Handle convert to CRM (used by drawer)
   async function handleConvert(lead: NewspaperLead) {
     await convertToCRMLead(lead, userId);
     setActions((prev) => ({
       ...prev,
       [lead.id]: { ...prev[lead.id], is_converted: true } as NewspaperLeadAction,
     }));
+  }
+
+  // Quick one-click convert directly from the table row (no drawer needed)
+  async function handleQuickConvert(lead: NewspaperLead, e: React.MouseEvent) {
+    e.stopPropagation(); // don't open the drawer
+    if (actions[lead.id]?.is_converted || convertingId) return;
+    setConvertingId(lead.id);
+    try {
+      await convertToCRMLead(lead, userId);
+      setActions((prev) => ({
+        ...prev,
+        [lead.id]: { ...prev[lead.id], is_converted: true } as NewspaperLeadAction,
+      }));
+    } finally {
+      setConvertingId(null);
+    }
   }
 
   // ── Loading state ──────────────────────────────────────────────────────────
@@ -465,6 +517,9 @@ export default function NewspaperPage() {
         <KpiCard label="Cities"        value={citiesCount} sub="Covered" />
         <KpiCard label="My Converted"  value={myConverted} accent="text-blue-600" sub="In your CRM" />
       </div>
+
+      {/* ── City Distribution Chart ── */}
+      {leads.length > 0 && <CityChart leads={leads} />}
 
       {/* ── Filter bar ── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4 flex flex-col gap-3">
@@ -598,14 +653,32 @@ export default function NewspaperPage() {
                       </td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
-                          <a href={`tel:${lead.phone}`} className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors">
+                          {/* Call */}
+                          <a href={`tel:${lead.phone}`} className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors" title="Call">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                           </a>
-                          <button
-                            onClick={() => setSelectedLead(lead)}
-                            className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-                          >
+                          {/* View (open drawer) */}
+                          <button onClick={() => setSelectedLead(lead)} className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors" title="View details">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                          </button>
+                          {/* Quick Add to CRM — one click, no drawer */}
+                          <button
+                            onClick={(e) => handleQuickConvert(lead, e)}
+                            disabled={!!convertingId || action?.is_converted}
+                            title={action?.is_converted ? "Already in your CRM" : "Add to my CRM"}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              action?.is_converted
+                                ? "bg-blue-50 text-blue-500 cursor-default"
+                                : "bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-600"
+                            }`}
+                          >
+                            {convertingId === lead.id ? (
+                              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                            ) : action?.is_converted ? (
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                            ) : (
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                            )}
                           </button>
                         </div>
                       </td>
