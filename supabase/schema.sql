@@ -95,3 +95,46 @@ create policy "Properties: users manage their own"
   on properties for all
   using      (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- TABLE: tasks
+-- Each row = one task a broker needs to do (call a lead, schedule site visit, etc.)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+create table if not exists tasks (
+  id          uuid primary key default gen_random_uuid(),
+
+  -- which broker this task belongs to
+  user_id     uuid references auth.users(id) on delete cascade not null,
+
+  -- which lead this task is about (optional — task might not be linked to a lead)
+  lead_id     uuid references leads(id) on delete set null,
+
+  -- we store the lead name + phone directly so we can show them even if lead is deleted
+  lead_name   text not null default '',
+  lead_phone  text not null default '',
+
+  -- what kind of task: Call / Site Visit / Send Docs / Follow Up / Negotiation
+  type        text not null default 'Call',
+
+  -- how urgent: high / medium / low
+  priority    text not null default 'medium'
+              check (priority in ('high', 'medium', 'low')),
+
+  -- when this task needs to be done by
+  due_date    timestamptz not null,
+
+  -- false = still to do, true = done
+  completed   boolean not null default false,
+
+  created_at  timestamptz default now()
+);
+
+-- Turn on the lock (same as leads and properties)
+alter table tasks enable row level security;
+
+-- Rule: each broker only sees and edits their own tasks
+create policy "Tasks: users manage their own"
+  on tasks for all
+  using      (auth.uid() = user_id)
+  with check (auth.uid() = user_id);

@@ -10,7 +10,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getAllLeads, getDashboardStats } from "@/lib/db/leads";
-import { mockTasks, formatPrice, initials } from "@/lib/mock-data";
+import { getAllTasks } from "@/lib/db/tasks";
+import { formatPrice, initials } from "@/lib/mock-data";
 import { Lead, LeadStage, Task, TaskPriority } from "@/lib/types";
 
 // ── colour maps ───────────────────────────────────────────────────────────────
@@ -58,6 +59,7 @@ export default function DashboardPage() {
 
   // Real recent leads from Supabase
   const [recentLeads, setRecentLeads] = useState<Lead[]>([]);
+  const [todayTasks, setTodayTasks]   = useState<Task[]>([]);
 
   const todayStr = new Date().toLocaleDateString("en-IN", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
@@ -95,6 +97,10 @@ export default function DashboardPage() {
       // Show 7 most recent leads
       setRecentLeads(leads.slice(0, 7));
 
+      // Load real tasks (show only pending, max 5)
+      const tasks = await getAllTasks();
+      setTodayTasks(tasks.filter((t) => !t.completed).slice(0, 5));
+
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
 
@@ -109,7 +115,7 @@ export default function DashboardPage() {
     }
   }
 
-  const pendingTasks = mockTasks.filter((t) => !t.completed);
+  const pendingTasks = todayTasks;
 
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-[1280px] mx-auto">
@@ -371,7 +377,10 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex flex-col divide-y divide-gray-50 flex-1">
-            {mockTasks.map((task, i) => (
+            {todayTasks.length === 0 && dbStatus === "connected" && (
+              <p className="text-xs text-gray-400 text-center py-6">No pending tasks.</p>
+            )}
+            {todayTasks.map((task, i) => (
               <TaskItem key={task.id} task={task} index={i} />
             ))}
           </div>

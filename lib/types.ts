@@ -43,11 +43,13 @@ export type TaskPriority = "high" | "medium" | "low";
 
 export interface Task {
   id: string;
-  lead_id: string;
+  user_id: string;       // which broker this task belongs to
+  lead_id?: string;      // which lead it's about (optional)
   lead_name: string;
   lead_phone: string;
   type: TaskType;
   priority: TaskPriority;
   due_date: string;
   completed: boolean;
+  created_at?: string;
 }

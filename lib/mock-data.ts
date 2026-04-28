@@ -155,6 +155,7 @@ export const mockProperties: Property[] = [
 export const mockTasks: Task[] = [
   {
     id: "1",
+    user_id: MOCK_USER_ID,
     lead_id: "1",
     lead_name: "Rahul Sharma",
     lead_phone: "+91 98765 43210",
@@ -165,6 +166,7 @@ export const mockTasks: Task[] = [
   },
   {
     id: "2",
+    user_id: MOCK_USER_ID,
     lead_id: "2",
     lead_name: "Priya Nair",
     lead_phone: "+91 91234 56789",
@@ -175,6 +177,7 @@ export const mockTasks: Task[] = [
   },
   {
     id: "3",
+    user_id: MOCK_USER_ID,
     lead_id: "3",
     lead_name: "Amit Patel",
     lead_phone: "+91 99887 65432",
@@ -185,6 +188,7 @@ export const mockTasks: Task[] = [
   },
   {
     id: "4",
+    user_id: MOCK_USER_ID,
     lead_id: "4",
     lead_name: "Sunita Joshi",
     lead_phone: "+91 98100 12345",
@@ -195,6 +199,7 @@ export const mockTasks: Task[] = [
   },
   {
     id: "5",
+    user_id: MOCK_USER_ID,
     lead_id: "6",
     lead_name: "Deepa Menon",
     lead_phone: "+91 96543 21098",
