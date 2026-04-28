@@ -1,0 +1,50 @@
+// lib/types.ts — shared TypeScript types for EstatePro CRM
+
+export type LeadStage = "new" | "contacted" | "viewing" | "negotiating" | "closed" | "lost";
+
+export type LeadSource = "website" | "referral" | "social" | "walk-in" | "ad" | "other";
+
+export type PropertyInterest = "1BHK" | "2BHK" | "3BHK" | "4BHK" | "Villa" | "Plot" | "Commercial";
+
+export interface Lead {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  source: LeadSource;
+  budget_min: number;
+  budget_max: number;
+  location: string;
+  stage: LeadStage;
+  notes: string;
+  created_at: string;
+  property_interest?: PropertyInterest;
+}
+
+export type PropertyType = "apartment" | "villa" | "plot" | "commercial" | "office";
+
+export type PropertyStatus = "available" | "sold" | "rented" | "off-market";
+
+export interface Property {
+  id: string;
+  title: string;
+  type: PropertyType;
+  location: string;
+  price: number;
+  status: PropertyStatus;
+}
+
+export type TaskType = "Call" | "Site Visit" | "Send Docs" | "Follow Up" | "Negotiation";
+
+export type TaskPriority = "high" | "medium" | "low";
+
+export interface Task {
+  id: string;
+  lead_id: string;
+  lead_name: string;
+  lead_phone: string;
+  type: TaskType;
+  priority: TaskPriority;
+  due_date: string;
+  completed: boolean;
+}
