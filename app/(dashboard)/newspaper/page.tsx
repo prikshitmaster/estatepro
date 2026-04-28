@@ -613,7 +613,7 @@ export default function NewspaperPage() {
       {viewMode === "table" && filtered.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[860px]">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
                   {["Area", "Type", "BHK", "Intent", "Price", "Phone", "Owner", "Status", "Actions"].map((h) => (
