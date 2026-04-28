@@ -206,7 +206,19 @@ function PropertyCard({ property }: { property: Property }) {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col gap-3 hover:shadow-sm transition-shadow">
+    <div className="bg-white rounded-2xl border border-gray-200 flex flex-col hover:shadow-sm transition-shadow overflow-hidden">
+
+      {/* Property photo — shown only if uploaded */}
+      {property.image_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={property.image_url}
+          alt={property.title}
+          className="w-full h-36 object-cover"
+        />
+      )}
+
+      <div className="p-5 flex flex-col gap-3">
 
       {/* Type label + status badge */}
       <div className="flex items-center justify-between">
@@ -230,23 +242,23 @@ function PropertyCard({ property }: { property: Property }) {
       {/* Price in INR shorthand e.g. ₹1.2Cr */}
       <p className="text-blue-600 font-bold text-base">{formatPrice(property.price)}</p>
 
-      {/* Action buttons — coming in next update, shown as disabled so nothing breaks */}
+      {/* Action buttons */}
       <div className="flex gap-2 pt-1">
-        <button
-          disabled
-          title="Edit — coming soon"
-          className="flex-1 py-2 text-xs font-medium border border-gray-100 text-gray-300 rounded-xl cursor-not-allowed"
+        <Link
+          href={`/properties/${property.id}/edit`}
+          className="flex-1 py-2 text-xs font-medium text-center border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl transition-colors"
         >
           Edit
-        </button>
-        <button
-          disabled
-          title="View Details — coming soon"
-          className="flex-1 py-2 text-xs font-medium bg-gray-50 text-gray-300 rounded-xl cursor-not-allowed"
+        </Link>
+        <Link
+          href={`/properties/${property.id}`}
+          className="flex-1 py-2 text-xs font-medium text-center bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl transition-colors"
         >
           View Details
-        </button>
+        </Link>
       </div>
+
+      </div>{/* end inner padding div */}
     </div>
   );
 }

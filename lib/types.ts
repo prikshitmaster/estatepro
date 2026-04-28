@@ -34,6 +34,7 @@ export interface Property {
   location: string;
   price: number;
   status: PropertyStatus;
+  image_url?: string;  // optional photo uploaded to Supabase Storage
   created_at?: string;
 }
 

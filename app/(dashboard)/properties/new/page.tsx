@@ -1,22 +1,21 @@
 // app/(dashboard)/properties/new/page.tsx — Add a new property
-//
-// 🧠 WHAT THIS PAGE DOES:
-//    When a broker wants to list a new property (apartment, villa, etc.)
-//    they fill in this form and click "Save Property".
-//    The property gets saved to Supabase and shows up on the Properties page.
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { addProperty } from "@/lib/db/properties";
+import { addProperty, uploadPropertyImage } from "@/lib/db/properties";
 import { supabase } from "@/lib/supabase";
 import { PropertyType, PropertyStatus } from "@/lib/types";
+import ImageUpload from "@/app/_components/ImageUpload";
 
 export default function NewPropertyPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [saveError, setSaveError] = useState("");
+
+  // imageFile = the File object the user picked (null = no image selected)
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   const [form, setForm] = useState({
     title:    "",
@@ -39,13 +38,23 @@ export default function NewPropertyPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
 
+      // Step 1: upload image if one was selected
+      // uploadPropertyImage returns a URL string like "https://xyz.supabase.co/..."
+      // If no image was picked, imageUrl stays undefined
+      let imageUrl: string | undefined;
+      if (imageFile) {
+        imageUrl = await uploadPropertyImage(imageFile, user.id);
+      }
+
+      // Step 2: save the property with the image URL (or without it if not uploaded)
       await addProperty({
-        user_id:  user.id,
-        title:    form.title,
-        type:     form.type,
-        location: form.location,
-        price:    parseInt(form.price) || 0,
-        status:   form.status,
+        user_id:   user.id,
+        title:     form.title,
+        type:      form.type,
+        location:  form.location,
+        price:     parseInt(form.price) || 0,
+        status:    form.status,
+        image_url: imageUrl,
       });
 
       router.push("/properties");
@@ -71,6 +80,9 @@ export default function NewPropertyPage() {
 
       <div className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+
+          {/* Image upload — optional */}
+          <ImageUpload onFileChange={setImageFile} />
 
           <Field label="Property Title *">
             <input
@@ -127,10 +139,8 @@ export default function NewPropertyPage() {
             >
               {loading ? "Saving..." : "Save Property"}
             </button>
-            <Link
-              href="/properties"
-              className="flex-1 sm:flex-none sm:px-8 py-3 text-center border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-xl transition-colors"
-            >
+            <Link href="/properties"
+              className="flex-1 sm:flex-none sm:px-8 py-3 text-center border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-xl transition-colors">
               Cancel
             </Link>
           </div>

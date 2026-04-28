@@ -138,3 +138,42 @@ create policy "Tasks: users manage their own"
   on tasks for all
   using      (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- PROPERTY IMAGES — Supabase Storage
+--
+-- 🧠 Simple explanation:
+--    The properties table stores TEXT (title, location, price).
+--    But photos are FILES — they can't go in a table.
+--    Supabase Storage is like a Google Drive for your app.
+--    We upload the photo there and save the link (URL) in the properties table.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Add image URL column to properties (safe to run even if it already exists)
+alter table properties add column if not exists image_url text;
+
+-- Create a storage bucket called "property-images" (public = anyone can VIEW photos)
+insert into storage.buckets (id, name, public)
+values ('property-images', 'property-images', true)
+on conflict (id) do nothing;
+
+-- Rule: logged-in users can upload photos into their own folder
+create policy "Property images: upload"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'property-images'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+-- Rule: anyone can VIEW the photos (needed to show them in the app)
+create policy "Property images: view"
+  on storage.objects for select to public
+  using (bucket_id = 'property-images');
+
+-- Rule: users can delete their own photos
+create policy "Property images: delete"
+  on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'property-images'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );

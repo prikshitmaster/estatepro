@@ -79,3 +79,48 @@ export async function deleteProperty(id: string): Promise<void> {
 
   if (error) throw new Error(error.message);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UPLOAD A PROPERTY IMAGE
+//
+// 🧠 Simple explanation:
+//    Think of Supabase Storage like a filing cabinet for photos.
+//    This function takes a photo file, puts it in the cabinet,
+//    and gives back the URL (web address) of that photo.
+//    We then save that URL in the property's image_url field.
+//
+// Takes: the image File object + the user's id
+// Returns: the public URL string (e.g. https://xyz.supabase.co/storage/v1/...)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function uploadPropertyImage(file: File, userId: string): Promise<string> {
+  // Validate file size — max 5MB
+  // 5 * 1024 * 1024 = 5,242,880 bytes = 5MB
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error("Image must be smaller than 5MB.");
+  }
+
+  // Validate file type — only allow image files
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Please select an image file (JPG, PNG, WebP, etc.).");
+  }
+
+  // Build a unique file path: userId/timestamp.extension
+  // e.g. "abc123/1714300000000.jpg"
+  // Putting userId as the folder name matches our storage policy
+  const ext      = file.name.split(".").pop() ?? "jpg";
+  const filePath = `${userId}/${Date.now()}.${ext}`;
+
+  // Upload the file to the "property-images" bucket in Supabase Storage
+  const { error: uploadError } = await supabase.storage
+    .from("property-images")
+    .upload(filePath, file);
+
+  if (uploadError) throw new Error(uploadError.message);
+
+  // Get the public URL so the browser can display the image
+  const { data } = supabase.storage
+    .from("property-images")
+    .getPublicUrl(filePath);
+
+  return data.publicUrl;
+}
