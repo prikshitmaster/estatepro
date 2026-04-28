@@ -38,6 +38,22 @@ export interface Property {
   created_at?: string;
 }
 
+// ── Client types ─────────────────────────────────────────────────────────────
+// ClientType: is this person a buyer, a seller, or both?
+export type ClientType = "buyer" | "seller" | "both";
+
+export interface Client {
+  id: string;
+  user_id: string;       // which broker this client belongs to
+  name: string;
+  phone: string;
+  email: string;
+  type: ClientType;      // buyer / seller / both
+  notes: string;         // any notes about this client
+  total_deals: number;   // how many deals done with them so far
+  created_at?: string;
+}
+
 export type TaskType = "Call" | "Site Visit" | "Send Docs" | "Follow Up" | "Negotiation";
 
 export type TaskPriority = "high" | "medium" | "low";
