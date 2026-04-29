@@ -12,7 +12,7 @@
 //      4. Clicking anywhere else closes the dropdown (useEffect + click listener)
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { getAllLeads, updateLead } from "@/lib/db/leads";
 import { formatPrice, initials } from "@/lib/mock-data";
@@ -51,13 +51,6 @@ export default function LeadsPage() {
   const [search, setSearch]           = useState("");
   const [activeStage, setActiveStage] = useState<LeadStage | "all">("all");
 
-  // openStageId = the lead whose stage dropdown is currently open
-  // null = no dropdown open
-  const [openStageId, setOpenStageId] = useState<string | null>(null);
-
-  // ref to detect clicks outside the dropdown so we can close it
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     async function fetchLeads() {
       try {
@@ -73,35 +66,15 @@ export default function LeadsPage() {
     fetchLeads();
   }, []);
 
-  // Close dropdown when user clicks anywhere outside it
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpenStageId(null);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Called when user picks a new stage from the dropdown
-  // Updates the screen instantly (optimistic) then saves to Supabase
-  async function handleStageChange(leadId: string, newStage: LeadStage) {
-    setOpenStageId(null); // close dropdown immediately
-
-    // Update the lead in our local list right away — feels instant
-    setLeads((prev) =>
-      prev.map((l) => l.id === leadId ? { ...l, stage: newStage } : l)
-    );
-
+  const handleStageChange = useCallback(async (leadId: string, newStage: LeadStage) => {
+    setLeads((prev) => prev.map((l) => l.id === leadId ? { ...l, stage: newStage } : l));
     try {
-      await updateLead(leadId, { stage: newStage }); // save to Supabase
+      await updateLead(leadId, { stage: newStage });
     } catch {
-      // If save failed, re-fetch to restore correct state
       const fresh = await getAllLeads();
       setLeads(fresh);
     }
-  }
+  }, []);
 
   const filtered = leads.filter((lead) => {
     const matchesStage  = activeStage === "all" || lead.stage === activeStage;
@@ -224,14 +197,7 @@ export default function LeadsPage() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500 capitalize">{lead.source}</td>
                     <td className="px-4 py-3">
-                      {/* ── Clickable stage badge ── */}
-                      <StageBadge
-                        lead={lead}
-                        openStageId={openStageId}
-                        setOpenStageId={setOpenStageId}
-                        onStageChange={handleStageChange}
-                        dropdownRef={dropdownRef}
-                      />
+                      <StageBadge lead={lead} onStageChange={handleStageChange} />
                     </td>
                   </tr>
                 ))}
@@ -253,14 +219,7 @@ export default function LeadsPage() {
                     <p className="text-xs text-gray-400 mt-0.5">{lead.location} · {formatPrice(lead.budget_max)}</p>
                   </div>
                 </Link>
-                {/* Clickable stage badge on mobile too */}
-                <StageBadge
-                  lead={lead}
-                  openStageId={openStageId}
-                  setOpenStageId={setOpenStageId}
-                  onStageChange={handleStageChange}
-                  dropdownRef={dropdownRef}
-                />
+                <StageBadge lead={lead} onStageChange={handleStageChange} />
               </div>
             ))}
           </div>
@@ -271,44 +230,39 @@ export default function LeadsPage() {
 }
 
 // ── Stage badge with dropdown ─────────────────────────────────────────────────
-//
-// 🧠 WHAT THIS COMPONENT DOES:
-//    Shows the current stage as a coloured badge (e.g. "New" in blue).
-//    When clicked, opens a dropdown showing all 6 stages.
-//    Picking a stage calls onStageChange() → saves to Supabase instantly.
-//
-// It's a separate component to keep the main page clean.
+// Each badge manages its own open/close state — no shared ref across rows
 function StageBadge({
-  lead, openStageId, setOpenStageId, onStageChange, dropdownRef,
+  lead,
+  onStageChange,
 }: {
   lead: Lead;
-  openStageId: string | null;
-  setOpenStageId: (id: string | null) => void;
   onStageChange: (id: string, stage: LeadStage) => void;
-  dropdownRef: React.RefObject<HTMLDivElement | null>;
 }) {
-  const isOpen = openStageId === lead.id;
+  const [isOpen, setIsOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close when clicking outside this specific badge
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [isOpen]);
 
   return (
-    <div className="relative shrink-0" ref={isOpen ? dropdownRef : undefined}>
-
-      {/* The badge itself — clicking opens/closes the dropdown */}
+    <div ref={ref} className="relative shrink-0">
       <button
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setOpenStageId(isOpen ? null : lead.id);
-        }}
+        onClick={(e) => { e.stopPropagation(); setIsOpen((v) => !v); }}
         className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize flex items-center gap-1 ${STAGE_STYLE[lead.stage]}`}
       >
         {lead.stage}
-        {/* Small arrow icon to hint it's clickable */}
         <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
-      {/* Dropdown — only shown when isOpen is true */}
       {isOpen && (
         <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[130px]">
           {ALL_STAGES.map((stage) => (
@@ -316,13 +270,13 @@ function StageBadge({
               key={stage}
               onClick={(e) => {
                 e.stopPropagation();
+                setIsOpen(false);
                 onStageChange(lead.id, stage);
               }}
               className={`w-full text-left px-3 py-2 text-xs font-medium capitalize flex items-center gap-2 hover:bg-gray-50 transition-colors ${
                 lead.stage === stage ? "text-blue-600" : "text-gray-700"
               }`}
             >
-              {/* Dot indicator */}
               <span className={`w-2 h-2 rounded-full shrink-0 ${
                 stage === "new" ? "bg-blue-400" :
                 stage === "contacted" ? "bg-amber-400" :
@@ -331,7 +285,6 @@ function StageBadge({
                 stage === "closed" ? "bg-green-400" : "bg-red-400"
               }`} />
               {stage}
-              {/* Tick on current stage */}
               {lead.stage === stage && (
                 <svg className="w-3 h-3 ml-auto text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />

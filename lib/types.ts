@@ -8,7 +8,7 @@ export type PropertyInterest = "1BHK" | "2BHK" | "3BHK" | "4BHK" | "Villa" | "Pl
 
 export interface Lead {
   id: string;
-  user_id: string; // which broker this lead belongs to (Supabase user id)
+  user_id: string;
   name: string;
   phone: string;
   email: string;
@@ -20,6 +20,7 @@ export interface Lead {
   notes: string;
   created_at: string;
   property_interest?: PropertyInterest;
+  next_follow_up_at?: string | null; // set when broker snoozes a follow-up
 }
 
 export type PropertyType = "apartment" | "villa" | "plot" | "commercial" | "office";
@@ -100,6 +101,22 @@ export interface NewspaperUpload {
   uploaded_by: string;
   notes: string;
   uploaded_at: string;
+}
+
+// ── Follow-Up Log types ───────────────────────────────────────────────────────
+
+export type FollowUpType    = "call" | "whatsapp" | "visit" | "note";
+export type FollowUpOutcome = "called" | "no_answer" | "busy" | "callback" | "visited" | "note";
+
+export interface FollowUpLog {
+  id: string;
+  lead_id: string;
+  user_id: string;
+  type: FollowUpType;
+  outcome: FollowUpOutcome;
+  note: string;
+  next_follow_up_at: string | null;
+  created_at: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

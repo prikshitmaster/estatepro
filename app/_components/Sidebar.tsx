@@ -10,16 +10,19 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getAllLeads } from "@/lib/db/leads";
+import { getFollowUpLogs } from "@/lib/db/follow-ups";
 
 const navItems = [
-  { label: "Dashboard",        href: "/dashboard",  icon: DashboardIcon  },
-  { label: "Leads",            href: "/leads",      icon: LeadsIcon      },
-  { label: "Properties",       href: "/properties", icon: PropertiesIcon },
-  { label: "Clients",          href: "/clients",    icon: ClientsIcon    },
-  { label: "Tasks",            href: "/tasks",      icon: TasksIcon      },
-  { label: "Analytics",        href: "/analytics",  icon: AnalyticsIcon  },
-  { label: "AI Tools",         href: "/ai-tools",   icon: AIIcon         },
-  { label: "Newspaper Leads",  href: "/newspaper",  icon: NewspaperIcon  },
+  { label: "Dashboard",        href: "/dashboard",   icon: DashboardIcon  },
+  { label: "Leads",            href: "/leads",       icon: LeadsIcon      },
+  { label: "Follow-Ups",       href: "/follow-ups",  icon: FollowUpIcon   },
+  { label: "Properties",       href: "/properties",  icon: PropertiesIcon },
+  { label: "Clients",          href: "/clients",     icon: ClientsIcon    },
+  { label: "Tasks",            href: "/tasks",       icon: TasksIcon      },
+  { label: "Analytics",        href: "/analytics",   icon: AnalyticsIcon  },
+  { label: "AI Tools",         href: "/ai-tools",    icon: AIIcon         },
+  { label: "Newspaper Leads",  href: "/newspaper",   icon: NewspaperIcon  },
 ];
 
 // Returns the first 2 initials from a name e.g. "Jay Patel" → "JP"
@@ -36,10 +39,10 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router   = useRouter();
 
-  const [userName,    setUserName]    = useState("");
-  const [userEmail,   setUserEmail]   = useState("");
-  // Today's newspaper lead count — shows as a badge on the nav item
-  const [todayCount,  setTodayCount]  = useState(0);
+  const [userName,      setUserName]      = useState("");
+  const [userEmail,     setUserEmail]     = useState("");
+  const [todayCount,    setTodayCount]    = useState(0);
+  const [overdueCount,  setOverdueCount]  = useState(0);
 
   // Runs once when the sidebar first appears on screen
   // Asks Supabase "who is currently logged in?"
@@ -58,7 +61,7 @@ export default function Sidebar() {
     }
     loadUser();
 
-    // Count today's newspaper leads for the sidebar badge
+    // Newspaper badge
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     supabase
@@ -67,6 +70,28 @@ export default function Sidebar() {
       .eq("is_active", true)
       .gte("uploaded_at", todayStart.toISOString())
       .then(({ count }) => { if (count) setTodayCount(count); });
+
+    // Follow-up overdue badge — compute client-side
+    const OVERDUE: Partial<Record<string, number>> = {
+      negotiating: 1, new: 1, viewing: 2, contacted: 4,
+    };
+    supabase.auth.getUser().then(({ data: { user: u } }) => {
+    Promise.all([getAllLeads(), getFollowUpLogs(u?.id ?? "")]).then(([leads, logs]) => {
+      const lastLogMap: Record<string, string> = {};
+      logs.forEach((l) => { if (!lastLogMap[l.lead_id]) lastLogMap[l.lead_id] = l.created_at; });
+      let count = 0;
+      const today = new Date().toISOString().slice(0, 10);
+      leads.forEach((lead) => {
+        if (lead.stage === "closed" || lead.stage === "lost") return;
+        if (lead.next_follow_up_at && lead.next_follow_up_at.slice(0, 10) > today) return;
+        const last = lastLogMap[lead.id] ?? lead.created_at;
+        const days = Math.floor((Date.now() - new Date(last).getTime()) / 86400000);
+        const threshold = OVERDUE[lead.stage] ?? 999;
+        if (days >= threshold) count++;
+      });
+      setOverdueCount(count);
+    }).catch(() => {});
+    }).catch(() => {});
   }, []); // [] means run once on load, not on every re-render
 
   // Called when the user clicks "Sign out"
@@ -106,10 +131,14 @@ export default function Sidebar() {
             >
               <Icon active={active} />
               <span className="flex-1">{label}</span>
-              {/* Today's newspaper leads badge — shows how many fresh leads arrived today */}
               {href === "/newspaper" && todayCount > 0 && (
                 <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none">
                   {todayCount > 99 ? "99+" : todayCount}
+                </span>
+              )}
+              {href === "/follow-ups" && overdueCount > 0 && (
+                <span className="text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none">
+                  {overdueCount > 99 ? "99+" : overdueCount}
                 </span>
               )}
             </Link>
@@ -180,6 +209,9 @@ function PropertiesIcon({ active }: { active: boolean }) {
 }
 function ClientsIcon({ active }: { active: boolean }) {
   return <svg className={`w-4 h-4 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
+}
+function FollowUpIcon({ active }: { active: boolean }) {
+  return <svg className={`w-4 h-4 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>;
 }
 function TasksIcon({ active }: { active: boolean }) {
   return <svg className={`w-4 h-4 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>;
