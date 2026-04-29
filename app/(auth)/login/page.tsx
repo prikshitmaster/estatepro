@@ -79,19 +79,19 @@ export default function LoginPage() {
   const anyLoading = loading || oauthLoading !== null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#F5F7FA' }}>
       <div className="w-full max-w-md">
 
         {/* Logo + title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600 mb-4">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-4" style={{ background: '#1BC47D' }}>
             <span className="text-white font-bold text-xl">E</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">EstatePro CRM</h1>
           <p className="text-gray-500 text-sm mt-1">Sign in to your account</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+        <div className="bg-white rounded-2xl p-8" style={{ border: '1px solid #EEF1F6', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
 
           {/* ── Social login buttons ── */}
           <div className="flex flex-col gap-3">
@@ -150,7 +150,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="w-full px-4 py-3 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none text-sm" style={{ border: '1px solid #EEF1F6' }}
               />
             </div>
 
@@ -166,7 +166,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="w-full px-4 py-3 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none text-sm" style={{ border: '1px solid #EEF1F6' }}
               />
             </div>
 
@@ -178,7 +178,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={anyLoading}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-xl transition-colors text-sm"
+              className="w-full py-3 px-4 text-white font-semibold rounded-xl transition-colors text-sm" style={{ background: '#1BC47D' }}
             >
               {loading ? "Signing in..." : "Sign in"}
             </button>
@@ -187,7 +187,7 @@ export default function LoginPage() {
           {/* Link to signup */}
           <p className="text-center text-sm text-gray-500 mt-6">
             Don&apos;t have an account?{" "}
-            <Link href="/signup" className="text-blue-600 font-medium hover:underline">
+            <Link href="/signup" className="font-medium hover:underline" style={{ color: '#1BC47D' }}>
               Sign up
             </Link>
           </p>

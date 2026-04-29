@@ -99,7 +99,7 @@ export default function LeadsPage() {
         </div>
         <Link
           href="/leads/new"
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
+          className="inline-flex items-center gap-2 px-5 py-2.5 text-white text-sm font-semibold rounded-xl transition-colors" style={{ background: '#1BC47D' }}
         >
           <PlusIcon />
           Add Lead
@@ -119,18 +119,19 @@ export default function LeadsPage() {
           placeholder="Search by name, location or phone..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full sm:max-w-sm px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          className="w-full sm:max-w-sm px-4 py-2.5 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none bg-white" style={{ border: '1px solid #EEF1F6' }}
         />
         <div className="flex gap-2 overflow-x-auto pb-1">
           {stageFilters.map((f) => (
             <button
               key={f.value}
               onClick={() => setActiveStage(f.value)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                activeStage === f.value
-                  ? "bg-blue-600 text-white"
-                  : "bg-white border border-gray-200 text-gray-500 hover:bg-gray-50"
-              }`}
+              className="px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors"
+              style={{
+                background: activeStage === f.value ? '#1BC47D' : '#fff',
+                color: activeStage === f.value ? '#fff' : '#6B7280',
+                border: activeStage === f.value ? '1px solid #1BC47D' : '1px solid #EEF1F6',
+              }}
             >
               {f.label}
             </button>
@@ -164,10 +165,10 @@ export default function LeadsPage() {
       {/* Desktop table */}
       {!loading && filtered.length > 0 && (
         <>
-          <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-visible">
+          <div className="hidden md:block bg-white rounded-2xl overflow-visible" style={{ border: '1px solid #EEF1F6' }}>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-50 text-left">
+                <tr className="text-left" style={{ borderBottom: '1px solid #F0F3F8' }}>
                   <th className="px-5 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wide">Lead</th>
                   <th className="px-4 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wide">Location</th>
                   <th className="px-4 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wide">Budget</th>
@@ -175,16 +176,16 @@ export default function LeadsPage() {
                   <th className="px-4 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wide">Stage</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-[#F0F3F8]">
                 {filtered.map((lead, i) => (
-                  <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={lead.id} className="hover:bg-[#F8F9FB] transition-colors">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2.5">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
                           {initials(lead.name)}
                         </div>
                         <div>
-                          <Link href={`/leads/${lead.id}`} className="font-semibold text-gray-900 hover:text-blue-600 text-sm block">
+                          <Link href={`/leads/${lead.id}`} className="font-semibold text-gray-900 hover:text-[#1BC47D] text-sm block">
                             {lead.name}
                           </Link>
                           <span className="text-xs text-gray-400">{lead.email}</span>
@@ -208,7 +209,7 @@ export default function LeadsPage() {
           {/* Mobile cards */}
           <div className="md:hidden flex flex-col gap-3">
             {filtered.map((lead, i) => (
-              <div key={lead.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-start justify-between">
+              <div key={lead.id} className="bg-white rounded-2xl p-4 flex items-start justify-between" style={{ border: '1px solid #EEF1F6' }}>
                 <Link href={`/leads/${lead.id}`} className="flex items-start gap-3 flex-1 min-w-0">
                   <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
                     {initials(lead.name)}
@@ -264,7 +265,7 @@ function StageBadge({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[130px]">
+        <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl shadow-lg py-1 min-w-[130px]" style={{ border: '1px solid #EEF1F6' }}>
           {ALL_STAGES.map((stage) => (
             <button
               key={stage}
@@ -273,9 +274,8 @@ function StageBadge({
                 setIsOpen(false);
                 onStageChange(lead.id, stage);
               }}
-              className={`w-full text-left px-3 py-2 text-xs font-medium capitalize flex items-center gap-2 hover:bg-gray-50 transition-colors ${
-                lead.stage === stage ? "text-blue-600" : "text-gray-700"
-              }`}
+              className="w-full text-left px-3 py-2 text-xs font-medium capitalize flex items-center gap-2 hover:bg-[#F8F9FB] transition-colors"
+              style={{ color: lead.stage === stage ? '#1BC47D' : '#374151' }}
             >
               <span className={`w-2 h-2 rounded-full shrink-0 ${
                 stage === "new" ? "bg-blue-400" :
@@ -286,7 +286,7 @@ function StageBadge({
               }`} />
               {stage}
               {lead.stage === stage && (
-                <svg className="w-3 h-3 ml-auto text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3 ml-auto" style={{ color: '#1BC47D' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                 </svg>
               )}

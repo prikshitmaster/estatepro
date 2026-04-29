@@ -299,16 +299,16 @@ export default function DashboardPage() {
           <div ref={profileRef} className="relative">
             <button
               onClick={() => { setProfileOpen((v) => !v); setNotifOpen(false); }}
-              className="w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-700 flex items-center justify-center text-white text-xs font-bold shrink-0 transition-colors"
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0 transition-colors" style={{ background: '#1BC47D' }}
             >
               {userName ? userName.charAt(0).toUpperCase() : "…"}
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+              <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl z-50 overflow-hidden" style={{ border: '1px solid #EEF1F6' }}>
                 {/* User info */}
-                <div className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-100">
-                  <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                <div className="flex items-center gap-3 px-4 py-3.5" style={{ borderBottom: '1px solid #EEF1F6' }}>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold shrink-0" style={{ background: '#1BC47D' }}>
                     {userName ? userName.charAt(0).toUpperCase() : "?"}
                   </div>
                   <div className="min-w-0">
@@ -342,7 +342,7 @@ export default function DashboardPage() {
                   </Link>
                 </div>
 
-                <div className="border-t border-gray-100 py-1">
+                <div className="py-1" style={{ borderTop: '1px solid #EEF1F6' }}>
                   <button
                     onClick={handleSignOut}
                     className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
@@ -370,7 +370,7 @@ export default function DashboardPage() {
           accent="blue"
           trend="↑ today"
           icon={<LeadStatIcon />}
-          footer={<Link href="/leads/new" className="w-full text-center text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg py-1.5 transition-colors block">+ New Lead</Link>}
+          footer={<Link href="/leads/new" className="w-full text-center text-xs font-semibold rounded-lg py-1.5 transition-colors block" style={{ color: '#1BC47D', background: '#F0FDF4' }}>+ New Lead</Link>}
         />
 
         <StatCard
@@ -392,11 +392,11 @@ export default function DashboardPage() {
         />
 
         {/* Commission card — always shows (estimated) */}
-        <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden">
+        <div className="rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1BC47D, #0fa865)' }}>
           <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full bg-white/10" />
           <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-white/10" />
           <div className="flex items-center justify-between relative">
-            <p className="text-xs font-medium text-blue-100">Projected Commission</p>
+            <p className="text-xs font-medium text-white/70">Projected Commission</p>
             <span className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
               <CommissionIcon />
             </span>
@@ -407,11 +407,11 @@ export default function DashboardPage() {
                 ? formatPrice(Math.round(stats.pipelineValue * 0.02)) // 2% of pipeline
                 : "₹—"}
             </p>
-            <p className="text-xs text-blue-100 mt-1 font-medium">2% of pipeline</p>
+            <p className="text-xs text-white/70 mt-1 font-medium">2% of pipeline</p>
           </div>
           <div className="flex items-center gap-1.5 relative">
             <CalendarIcon />
-            <span className="text-xs text-blue-100">
+            <span className="text-xs text-white/70">
               Pipeline: {dbConnected ? formatPrice(stats.pipelineValue) : "—"}
             </span>
           </div>
@@ -427,10 +427,10 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Leads Pipeline */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-            <h2 className="font-semibold text-gray-900 text-sm">Leads Pipeline</h2>
-            <Link href="/leads/new" className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors">
+        <div className="lg:col-span-2 bg-white rounded-2xl overflow-hidden" style={{ border: '1px solid #EEF1F6' }}>
+          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #EEF1F6' }}>
+            <h2 className="font-semibold text-sm" style={{ color: '#1A1D23' }}>Leads Pipeline</h2>
+            <Link href="/leads/new" className="flex items-center gap-1.5 px-3 py-1.5 text-white text-xs font-semibold rounded-lg transition-colors" style={{ background: '#1BC47D' }}>
               <PlusIcon /> Add Lead
             </Link>
           </div>
@@ -455,7 +455,7 @@ export default function DashboardPage() {
           {dbConnected && recentLeads.length === 0 && (
             <div className="py-12 text-center text-gray-400 text-sm">
               No leads yet.{" "}
-              <Link href="/leads/new" className="text-blue-600 hover:underline">Add your first lead →</Link>
+              <Link href="/leads/new" className="hover:underline" style={{ color: '#1BC47D' }}>Add your first lead →</Link>
             </div>
           )}
 
@@ -465,7 +465,7 @@ export default function DashboardPage() {
               <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-gray-50">
+                    <tr style={{ borderBottom: '1px solid #F0F3F8' }}>
                       <th className="px-5 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">Name</th>
                       <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">Location</th>
                       <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">Type</th>
@@ -474,16 +474,16 @@ export default function DashboardPage() {
                       <th className="px-4 py-3"></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-[#F0F3F8]">
                     {recentLeads.map((lead, i) => (
-                      <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                      <tr key={lead.id} className="hover:bg-[#F8F9FB] transition-colors">
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2.5">
                             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
                               {initials(lead.name)}
                             </div>
                             <div>
-                              <Link href={`/leads/${lead.id}`} className="text-xs font-semibold text-gray-900 hover:text-blue-600 block">{lead.name}</Link>
+                              <Link href={`/leads/${lead.id}`} className="text-xs font-semibold text-gray-900 hover:text-[#1BC47D] block">{lead.name}</Link>
                               <span className="text-[10px] text-gray-400">{lead.phone}</span>
                             </div>
                           </div>
@@ -495,7 +495,7 @@ export default function DashboardPage() {
                           <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize ${STAGE_STYLE[lead.stage]}`}>{lead.stage}</span>
                         </td>
                         <td className="px-4 py-3">
-                          <Link href={`/leads/${lead.id}`} className="w-6 h-6 inline-flex items-center justify-center rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors">
+                          <Link href={`/leads/${lead.id}`} className="w-6 h-6 inline-flex items-center justify-center rounded-lg hover:bg-[#F0FDF4] text-gray-400 hover:text-[#1BC47D] transition-colors">
                             <ChevronIcon />
                           </Link>
                         </td>
@@ -506,9 +506,9 @@ export default function DashboardPage() {
               </div>
 
               {/* Mobile card list */}
-              <div className="sm:hidden divide-y divide-gray-50">
+              <div className="sm:hidden divide-y divide-[#F0F3F8]">
                 {recentLeads.map((lead, i) => (
-                  <Link key={lead.id} href={`/leads/${lead.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
+                  <Link key={lead.id} href={`/leads/${lead.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-[#F8F9FB] transition-colors">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
                       {initials(lead.name)}
                     </div>
@@ -523,14 +523,14 @@ export default function DashboardPage() {
             </>
           )}
 
-          <div className="px-5 py-3 border-t border-gray-50">
-            <Link href="/leads" className="text-xs text-blue-600 font-medium hover:underline">View all leads →</Link>
+          <div className="px-5 py-3" style={{ borderTop: '1px solid #F0F3F8' }}>
+            <Link href="/leads" className="text-xs font-medium hover:underline" style={{ color: '#1BC47D' }}>View all leads →</Link>
           </div>
         </div>
 
         {/* Today's Tasks */}
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col">
-          <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
+        <div className="bg-white rounded-2xl overflow-hidden flex flex-col" style={{ border: '1px solid #EEF1F6' }}>
+          <div className="grid grid-cols-3 divide-x border-b" style={{ borderColor: '#EEF1F6' }}>
             <div className="px-3 py-3 text-center">
               <p className="text-xl font-bold text-gray-900">
                 {dbConnected ? stats.total : "—"}
@@ -551,12 +551,12 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <h2 className="font-semibold text-gray-900 text-sm">Today&apos;s Tasks</h2>
+          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #EEF1F6' }}>
+            <h2 className="font-semibold text-sm" style={{ color: '#1A1D23' }}>Today&apos;s Tasks</h2>
             <span className="text-[11px] text-gray-400">{pendingTasks.length} pending</span>
           </div>
 
-          <div className="flex flex-col divide-y divide-gray-50 flex-1">
+          <div className="flex flex-col divide-y divide-[#F0F3F8] flex-1">
             {todayTasks.length === 0 && dbConnected && (
               <p className="text-xs text-gray-400 text-center py-6">No pending tasks.</p>
             )}
@@ -565,8 +565,8 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <div className="px-4 py-3 border-t border-gray-50">
-            <Link href="/tasks" className="w-full text-xs text-blue-600 font-medium hover:underline text-center block">
+          <div className="px-4 py-3" style={{ borderTop: '1px solid #F0F3F8' }}>
+            <Link href="/tasks" className="w-full text-xs font-medium hover:underline text-center block" style={{ color: '#1BC47D' }}>
               View all tasks →
             </Link>
           </div>
@@ -599,7 +599,7 @@ function PipelineFunnelCard({ leads }: { leads: Lead[] }) {
   const convRate = total > 0 ? Math.round((closed / total) * 100) : 0;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4">
+    <div className="bg-white rounded-2xl px-5 py-4" style={{ border: '1px solid #EEF1F6' }}>
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="font-semibold text-gray-900 text-sm">Conversion Funnel</h2>
@@ -609,7 +609,7 @@ function PipelineFunnelCard({ leads }: { leads: Lead[] }) {
             <span className="font-semibold text-emerald-600">{convRate}% close rate</span>
           </p>
         </div>
-        <Link href="/analytics" className="text-xs text-blue-600 hover:underline font-medium">
+        <Link href="/analytics" className="text-xs hover:underline font-medium" style={{ color: '#1BC47D' }}>
           Full analytics →
         </Link>
       </div>
@@ -622,7 +622,7 @@ function PipelineFunnelCard({ leads }: { leads: Lead[] }) {
           return (
             <div key={stage} className="flex items-center gap-3">
               <p className={`text-[11px] font-bold w-[88px] shrink-0 ${text}`}>{label}</p>
-              <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+              <div className="flex-1 bg-[#F0F3F8] rounded-full h-2.5 overflow-hidden">
                 <div
                   className={`h-full rounded-full ${bar} transition-all duration-700`}
                   style={{ width: `${barWidth}%` }}
@@ -665,13 +665,13 @@ function StatCard({
   footer: React.ReactNode;
 }) {
   const accentBg: Record<string, string> = {
-    blue: "bg-blue-50", amber: "bg-amber-50", violet: "bg-violet-50",
+    blue: "bg-[#F0FDF4]", amber: "bg-amber-50", violet: "bg-violet-50",
   };
   const trendColor: Record<string, string> = {
-    blue: "text-blue-500", amber: "text-green-500", violet: "text-gray-400",
+    blue: "text-[#1BC47D]", amber: "text-green-500", violet: "text-gray-400",
   };
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-4 flex flex-col gap-3">
+    <div className="bg-white rounded-2xl p-4 flex flex-col gap-3" style={{ border: '1px solid #EEF1F6' }}>
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium text-gray-500">{label}</p>
         <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${accentBg[accent]}`}>
@@ -714,7 +714,7 @@ function TaskItem({ task, index }: { task: Task; index: number }) {
 
 function SearchIcon() { return <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>; }
 function BellIcon()   { return <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>; }
-function LeadStatIcon(){ return <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>; }
+function LeadStatIcon(){ return <svg className="w-4 h-4" style={{ color: '#1BC47D' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>; }
 function FollowUpIcon(){ return <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>; }
 function DealIcon()   { return <svg className="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>; }
 function CommissionIcon(){ return <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>; }
