@@ -90,7 +90,7 @@ export default function ViewerClient() {
   const svgTile = encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="80">` +
     `<text x="10" y="52" font-family="Arial,sans-serif" font-size="11" font-weight="700" ` +
-    `letter-spacing="2" fill="rgba(255,255,255,0.11)">${wText}</text></svg>`
+    `letter-spacing="2" fill="rgba(255,255,255,0.18)">${wText}</text></svg>`
   );
 
   return (
@@ -138,6 +138,48 @@ export default function ViewerClient() {
           </div>
         )}
 
+        {/* ── AMBIENT BLURRED BACKGROUND (image/video only) — fills black sidebars beautifully ── */}
+        {(current?.media_type === "image" || current?.media_type === "video") && current?.signed_url && (
+          current.media_type === "image" ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={"bg-" + current.id}
+              src={current.signed_url}
+              alt=""
+              aria-hidden
+              draggable={false}
+              style={{
+                position:  "absolute",
+                inset:     0,
+                width:     "100%",
+                height:    "100%",
+                objectFit: "cover",
+                filter:    "blur(28px) brightness(0.35) saturate(1.4)",
+                transform: "scale(1.08)",
+                pointerEvents: "none",
+              }}
+            />
+          ) : (
+            <video
+              key={"bg-" + current.id}
+              src={current.signed_url}
+              aria-hidden
+              muted
+              playsInline
+              style={{
+                position:  "absolute",
+                inset:     0,
+                width:     "100%",
+                height:    "100%",
+                objectFit: "cover",
+                filter:    "blur(28px) brightness(0.3) saturate(1.3)",
+                transform: "scale(1.08)",
+                pointerEvents: "none",
+              }}
+            />
+          )
+        )}
+
         {/* ── MEDIA AREA — fills entire screen ── */}
         <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
           {current?.media_type === "image" && current.signed_url && (
@@ -148,13 +190,15 @@ export default function ViewerClient() {
               alt={current.file_name}
               draggable={false}
               style={{
-                maxWidth:   "100%",
-                maxHeight:  "100%",
-                width:       "100%",
-                height:      "100%",
-                objectFit:  "contain",
-                display:    "block",
-                animation:  "fadeIn 0.3s ease",
+                maxWidth:  "100%",
+                maxHeight: "100%",
+                width:     "100%",
+                height:    "100%",
+                objectFit: "contain",
+                display:   "block",
+                animation: "fadeIn 0.3s ease",
+                position:  "relative",
+                zIndex:    1,
               }}
             />
           )}
@@ -167,7 +211,7 @@ export default function ViewerClient() {
               controlsList="nodownload"
               disablePictureInPicture
               autoPlay
-              style={{ maxWidth:"100%", maxHeight:"100%", width:"100%", height:"100%", objectFit:"contain", background:"#000" }}
+              style={{ maxWidth:"100%", maxHeight:"100%", width:"100%", height:"100%", objectFit:"contain", background:"transparent", position:"relative", zIndex:1 }}
             />
           )}
 
