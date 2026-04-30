@@ -84,6 +84,7 @@ export async function GET(
     title:             link.title,
     property_title:    link.property_title ?? null,
     watermark_enabled: link.watermark_enabled ?? true,
+    watermark_text:    link.watermark_text ?? "PROTECTED · ESTATEPRO",
     media:             signedMedia,
   });
 }

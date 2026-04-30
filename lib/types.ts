@@ -154,6 +154,7 @@ export interface SecureShareLink {
   view_count: number;
   is_active: boolean;
   watermark_enabled: boolean;
+  watermark_text?: string | null;
   password_hash?: string | null;
   created_at: string;
 }

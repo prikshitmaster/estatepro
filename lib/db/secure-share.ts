@@ -72,6 +72,7 @@ export async function createSecureShareLink(payload: {
   expires_at?: string | null;
   max_views?: number | null;
   watermark_enabled?: boolean;
+  watermark_text?: string;
 }): Promise<SecureShareLink> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
