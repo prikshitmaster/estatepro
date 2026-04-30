@@ -475,7 +475,7 @@ export default function DashboardPage() {
                   {pendingTasks.slice(0, 4).map((t) => (
                     <Link key={t.id} href="/tasks" className="flex items-center gap-2.5 group">
                       <div className={`w-2 h-2 rounded-full shrink-0 mt-0.5 ${t.priority === "high" ? "bg-red-500" : t.priority === "medium" ? "bg-amber-400" : "bg-green-400"}`} />
-                      <p className="text-xs font-medium text-gray-700 truncate flex-1 group-hover:text-green-600 transition-colors">{t.title}</p>
+                      <p className="text-xs font-medium text-gray-700 truncate flex-1 group-hover:text-green-600 transition-colors">{t.type} · {t.lead_name}</p>
                       {t.due_date && (
                         <span className="text-[10px] text-gray-400 shrink-0">
                           {new Date(t.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
