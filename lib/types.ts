@@ -153,6 +153,7 @@ export interface SecureShareLink {
   max_views?: number | null;
   view_count: number;
   is_active: boolean;
+  watermark_enabled: boolean;
   password_hash?: string | null;
   created_at: string;
 }
@@ -162,6 +163,7 @@ export interface ShareMedia {
   link_id: string;
   user_id: string;
   storage_path: string;
+  external_url?: string | null;
   file_name: string;
   media_type: ShareMediaType;
   file_size?: number | null;

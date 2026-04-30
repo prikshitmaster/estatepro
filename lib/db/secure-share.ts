@@ -71,6 +71,7 @@ export async function createSecureShareLink(payload: {
   property_title?: string;
   expires_at?: string | null;
   max_views?: number | null;
+  watermark_enabled?: boolean;
 }): Promise<SecureShareLink> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
@@ -103,6 +104,7 @@ export async function addShareMediaBatch(
     link_id: string;
     user_id: string;
     storage_path: string;
+    external_url?: string;
     file_name: string;
     media_type: ShareMediaType;
     file_size: number;

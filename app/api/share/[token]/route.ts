@@ -42,8 +42,17 @@ export async function GET(
     .order("sort_order");
 
   // ── 4. Generate signed URLs (15 min = 900 sec) ────────────────────────────
+  // External URLs (e.g. existing property images from public bucket) pass through directly.
   const signedMedia = await Promise.all(
     (media ?? []).map(async (m) => {
+      if (m.external_url) {
+        return {
+          id:         m.id,
+          file_name:  m.file_name,
+          media_type: m.media_type,
+          signed_url: m.external_url,
+        };
+      }
       const { data: signed } = await supabaseAdmin.storage
         .from("secure-share-media")
         .createSignedUrl(m.storage_path, 900);
@@ -72,8 +81,9 @@ export async function GET(
 
   // ── 6. Return payload to viewer ───────────────────────────────────────────
   return NextResponse.json({
-    title:          link.title,
-    property_title: link.property_title ?? null,
-    media:          signedMedia,
+    title:             link.title,
+    property_title:    link.property_title ?? null,
+    watermark_enabled: link.watermark_enabled ?? true,
+    media:             signedMedia,
   });
 }
