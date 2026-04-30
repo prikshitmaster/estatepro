@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { addProperty, uploadPropertyImage } from "@/lib/db/properties";
+import { addProperty, uploadPropertyMedia } from "@/lib/db/properties";
 import { supabase } from "@/lib/supabase";
 import { PropertyType, PropertyStatus } from "@/lib/types";
 import ImageUpload from "@/app/_components/ImageUpload";
@@ -14,8 +14,7 @@ export default function NewPropertyPage() {
   const [loading, setLoading] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  // imageFile = the File object the user picked (null = no image selected)
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
 
   const [form, setForm] = useState({
     title:    "",
@@ -38,23 +37,20 @@ export default function NewPropertyPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
 
-      // Step 1: upload image if one was selected
-      // uploadPropertyImage returns a URL string like "https://xyz.supabase.co/..."
-      // If no image was picked, imageUrl stays undefined
-      let imageUrl: string | undefined;
-      if (imageFile) {
-        imageUrl = await uploadPropertyImage(imageFile, user.id);
-      }
+      // Upload all selected media files and collect their URLs
+      const mediaUrls = mediaFiles.length > 0
+        ? await Promise.all(mediaFiles.map((f) => uploadPropertyMedia(f, user.id)))
+        : [];
 
-      // Step 2: save the property with the image URL (or without it if not uploaded)
       await addProperty({
-        user_id:   user.id,
-        title:     form.title,
-        type:      form.type,
-        location:  form.location,
-        price:     parseInt(form.price) || 0,
-        status:    form.status,
-        image_url: imageUrl,
+        user_id:    user.id,
+        title:      form.title,
+        type:       form.type,
+        location:   form.location,
+        price:      parseInt(form.price) || 0,
+        status:     form.status,
+        image_url:  mediaUrls[0],        // first photo/video = cover
+        media_urls: mediaUrls,           // all media
       });
 
       router.push("/properties");
@@ -81,8 +77,8 @@ export default function NewPropertyPage() {
       <div className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
 
-          {/* Image upload — optional */}
-          <ImageUpload onFileChange={setImageFile} />
+          {/* Media upload — up to 8 photos/videos, camera supported */}
+          <ImageUpload onFilesChange={setMediaFiles} />
 
           <Field label="Property Title *">
             <input

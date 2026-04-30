@@ -35,7 +35,8 @@ export interface Property {
   location: string;
   price: number;
   status: PropertyStatus;
-  image_url?: string;  // optional photo uploaded to Supabase Storage
+  image_url?: string;      // cover photo (first item of media_urls)
+  media_urls?: string[];   // all photos + videos (up to 8)
   created_at?: string;
 }
 

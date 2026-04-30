@@ -81,43 +81,39 @@ export async function deleteProperty(id: string): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UPLOAD A PROPERTY IMAGE
-//
-// 🧠 Simple explanation:
-//    Think of Supabase Storage like a filing cabinet for photos.
-//    This function takes a photo file, puts it in the cabinet,
-//    and gives back the URL (web address) of that photo.
-//    We then save that URL in the property's image_url field.
-//
-// Takes: the image File object + the user's id
-// Returns: the public URL string (e.g. https://xyz.supabase.co/storage/v1/...)
+// UPLOAD A SINGLE PROPERTY IMAGE (kept for backward compat)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function uploadPropertyImage(file: File, userId: string): Promise<string> {
-  // Validate file size — max 5MB
-  // 5 * 1024 * 1024 = 5,242,880 bytes = 5MB
-  if (file.size > 5 * 1024 * 1024) {
-    throw new Error("Image must be smaller than 5MB.");
+  return uploadPropertyMedia(file, userId);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UPLOAD A PROPERTY MEDIA FILE (image OR video)
+// Images: max 5MB  |  Videos: max 30MB
+// Returns: public URL string
+// ─────────────────────────────────────────────────────────────────────────────
+export async function uploadPropertyMedia(file: File, userId: string): Promise<string> {
+  const isVideo = file.type.startsWith("video/");
+  const maxSize = isVideo ? 30 * 1024 * 1024 : 5 * 1024 * 1024;
+  const label   = isVideo ? "30MB" : "5MB";
+
+  if (file.size > maxSize) {
+    throw new Error(`${isVideo ? "Video" : "Image"} must be smaller than ${label}.`);
+  }
+  if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+    throw new Error("Please select an image or video file.");
   }
 
-  // Validate file type — only allow image files
-  if (!file.type.startsWith("image/")) {
-    throw new Error("Please select an image file (JPG, PNG, WebP, etc.).");
-  }
+  const ext      = file.name.split(".").pop() ?? (isVideo ? "mp4" : "jpg");
+  const folder   = isVideo ? "videos" : "photos";
+  const filePath = `${userId}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-  // Build a unique file path: userId/timestamp.extension
-  // e.g. "abc123/1714300000000.jpg"
-  // Putting userId as the folder name matches our storage policy
-  const ext      = file.name.split(".").pop() ?? "jpg";
-  const filePath = `${userId}/${Date.now()}.${ext}`;
-
-  // Upload the file to the "property-images" bucket in Supabase Storage
   const { error: uploadError } = await supabase.storage
     .from("property-images")
     .upload(filePath, file);
 
   if (uploadError) throw new Error(uploadError.message);
 
-  // Get the public URL so the browser can display the image
   const { data } = supabase.storage
     .from("property-images")
     .getPublicUrl(filePath);

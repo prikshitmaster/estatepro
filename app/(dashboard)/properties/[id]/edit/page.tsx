@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { updateProperty, uploadPropertyImage } from "@/lib/db/properties";
+import { updateProperty, uploadPropertyMedia } from "@/lib/db/properties";
 import { Property, PropertyType, PropertyStatus } from "@/lib/types";
 import ImageUpload from "@/app/_components/ImageUpload";
 
@@ -17,9 +17,13 @@ export default function EditPropertyPage({ params }: Props) {
   const router = useRouter();
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading]   = useState(true);
-  const [saving, setSaving]       = useState(false);
+  const [saving, setSaving]     = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
+
+  // New files the user picked in this session
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  // Existing URLs still kept (user may remove some)
+  const [keptUrls, setKeptUrls] = useState<string[]>([]);
 
   const [form, setForm] = useState({
     title:    "",
@@ -47,6 +51,12 @@ export default function EditPropertyPage({ params }: Props) {
           price:    String(data.price),
           status:   data.status,
         });
+        // Build the existing media list (deduplicated)
+        const existing = [
+          data.image_url,
+          ...(data.media_urls ?? []),
+        ].filter((u): u is string => !!u);
+        setKeptUrls([...new Set(existing)]);
       }
       setLoading(false);
     }
@@ -57,6 +67,10 @@ export default function EditPropertyPage({ params }: Props) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  function removeExisting(url: string) {
+    setKeptUrls((prev) => prev.filter((u) => u !== url));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!property) return;
@@ -64,20 +78,24 @@ export default function EditPropertyPage({ params }: Props) {
     setSaving(true);
 
     try {
-      // Upload new image if one was selected, otherwise keep existing image_url
-      let imageUrl = property.image_url;
-      if (imageFile) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) imageUrl = await uploadPropertyImage(imageFile, user.id);
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
+
+      // Upload any new files
+      const newUrls = mediaFiles.length > 0
+        ? await Promise.all(mediaFiles.map((f) => uploadPropertyMedia(f, user.id)))
+        : [];
+
+      const allUrls = [...keptUrls, ...newUrls];
 
       await updateProperty(property.id, {
-        title:     form.title,
-        type:      form.type,
-        location:  form.location,
-        price:     parseInt(form.price) || 0,
-        status:    form.status,
-        image_url: imageUrl,
+        title:      form.title,
+        type:       form.type,
+        location:   form.location,
+        price:      parseInt(form.price) || 0,
+        status:     form.status,
+        image_url:  allUrls[0] ?? property.image_url,
+        media_urls: allUrls,
       });
       router.push(`/properties/${property.id}`);
     } catch (err) {
@@ -122,10 +140,10 @@ export default function EditPropertyPage({ params }: Props) {
       <div className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
 
-          {/* Image upload — shows current photo, or dotted box if none */}
           <ImageUpload
-            currentUrl={property.image_url}
-            onFileChange={setImageFile}
+            existingUrls={keptUrls}
+            onFilesChange={setMediaFiles}
+            onExistingRemove={removeExisting}
           />
 
           <Field label="Property Title *">

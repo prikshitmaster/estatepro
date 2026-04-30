@@ -1,114 +1,218 @@
-// app/_components/ImageUpload.tsx — Reusable image upload field
+// app/_components/ImageUpload.tsx — Multi-photo + video upload
 //
-// 🧠 WHAT THIS DOES (simple explanation):
-//    Think of this like a photo frame that starts empty.
-//    - If empty: shows a dotted box saying "Click to upload a photo"
-//    - After picking a photo: shows a preview of the image
-//    - Has an X button to remove the selected photo
-//    - If the property already HAS a photo (edit form): shows the current photo first
-//
-//    This component is used in BOTH the Add Property and Edit Property forms.
-//    It doesn't upload to Supabase by itself — the parent form does that on submit.
+// Features:
+//   - Select up to 8 photos from gallery (multiple at once)
+//   - Take a live photo with the phone camera
+//   - Pick videos from gallery
+//   - See all selected media in a grid, remove any item
+//   - Works in both Add Property and Edit Property forms
 "use client";
 
 import { useRef, useState } from "react";
 
-interface Props {
-  // currentUrl = existing image URL (only used in edit form — shows current photo)
-  currentUrl?: string;
-  // onFileChange = called whenever the user picks or removes a file
-  // parent form reads this to know what to upload on submit
-  onFileChange: (file: File | null) => void;
+const VIDEO_EXT = /\.(mp4|webm|mov|avi|mkv|ogv)(\?.*)?$/i;
+function isVideoUrl(url: string)  { return VIDEO_EXT.test(url); }
+function isVideoFile(file: File)  { return file.type.startsWith("video/"); }
+
+interface NewItem {
+  key: string;
+  previewUrl: string;
+  isVideo: boolean;
+  file: File;
 }
 
-export default function ImageUpload({ currentUrl, onFileChange }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
+interface Props {
+  // For edit form: URLs already saved in DB
+  existingUrls?: string[];
+  // Called whenever new files list changes
+  onFilesChange: (files: File[]) => void;
+  // Called when user removes an existing (already-saved) URL
+  onExistingRemove?: (url: string) => void;
+  maxTotal?: number;
+}
 
-  // preview = the local blob URL shown in the browser BEFORE uploading
-  // starts as the currentUrl (if editing) or empty
-  const [preview, setPreview] = useState<string>(currentUrl ?? "");
+export default function ImageUpload({
+  existingUrls = [],
+  onFilesChange,
+  onExistingRemove,
+  maxTotal = 8,
+}: Props) {
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const cameraRef  = useRef<HTMLInputElement>(null);
+  const videoRef   = useRef<HTMLInputElement>(null);
 
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const [newItems, setNewItems] = useState<NewItem[]>([]);
 
-    // Create a local preview URL so the user can see what they picked
-    // This is just a temporary URL — it only works in this browser tab
-    const objectUrl = URL.createObjectURL(file);
-    setPreview(objectUrl);
+  const totalCount = existingUrls.length + newItems.length;
+  const canAdd     = totalCount < maxTotal;
 
-    // Tell the parent form about the selected file
-    onFileChange(file);
+  function handleFilePick(files: FileList | null) {
+    if (!files) return;
+    const slots     = maxTotal - totalCount;
+    const toAdd     = Array.from(files).slice(0, slots);
+    const added: NewItem[] = toAdd.map((file) => ({
+      key:        `new-${Date.now()}-${Math.random()}`,
+      previewUrl: URL.createObjectURL(file),
+      isVideo:    isVideoFile(file),
+      file,
+    }));
+    const updated = [...newItems, ...added];
+    setNewItems(updated);
+    onFilesChange(updated.map((i) => i.file));
   }
 
-  function handleRemove() {
-    setPreview("");
-    onFileChange(null); // tell parent: no file selected anymore
-    if (inputRef.current) inputRef.current.value = ""; // reset the file input
+  function removeNew(key: string) {
+    const updated = newItems.filter((i) => i.key !== key);
+    setNewItems(updated);
+    onFilesChange(updated.map((i) => i.file));
   }
+
+  const hasMedia = totalCount > 0;
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1.5">
-        Property Photo <span className="text-gray-400 font-normal">(optional · max 5MB)</span>
-      </label>
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-2">
+        <label className="block text-sm font-medium text-gray-700">
+          Photos & Videos <span className="text-gray-400 font-normal">(optional)</span>
+        </label>
+        <span className="text-xs text-gray-400">{totalCount} / {maxTotal}</span>
+      </div>
 
-      {preview ? (
-        // ── Has an image selected — show preview + remove button ──────────────
-        <div className="relative w-full rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={preview}
-            alt="Property preview"
-            className="w-full h-48 object-cover"
-          />
-          {/* X button to remove the photo */}
-          <button
-            type="button"
-            onClick={handleRemove}
-            className="absolute top-2 right-2 w-7 h-7 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors"
-            title="Remove photo"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-          {/* Click to change photo */}
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="absolute bottom-2 right-2 px-3 py-1 bg-black/50 hover:bg-black/70 text-white text-xs font-medium rounded-lg transition-colors"
-          >
-            Change photo
-          </button>
+      {/* Thumbnail grid */}
+      {hasMedia && (
+        <div className="grid grid-cols-3 gap-2 mb-2">
+          {existingUrls.map((url) => (
+            <Thumb
+              key={url}
+              src={url}
+              isVideo={isVideoUrl(url)}
+              onRemove={onExistingRemove ? () => onExistingRemove(url) : undefined}
+            />
+          ))}
+          {newItems.map((item) => (
+            <Thumb
+              key={item.key}
+              src={item.previewUrl}
+              isVideo={item.isVideo}
+              onRemove={() => removeNew(item.key)}
+            />
+          ))}
         </div>
-      ) : (
-        // ── No image — show the upload area ────────────────────────────────────
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="w-full h-36 rounded-xl border-2 border-dashed border-gray-200 hover:border-blue-400 bg-gray-50 hover:bg-blue-50 flex flex-col items-center justify-center gap-2 transition-colors group"
-        >
-          <div className="w-10 h-10 rounded-full bg-gray-200 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
-            <svg className="w-5 h-5 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <div className="text-center">
-            <p className="text-sm text-gray-500 group-hover:text-blue-600 font-medium">Click to upload a photo</p>
-            <p className="text-xs text-gray-400">JPG, PNG, WebP — max 5MB</p>
-          </div>
-        </button>
       )}
 
-      {/* Hidden file input — triggered by the buttons above */}
+      {/* Action buttons */}
+      {canAdd ? (
+        <div className="grid grid-cols-3 gap-2">
+          <ActionBtn onClick={() => galleryRef.current?.click()} icon={<PhotoIcon />} label="Photos" />
+          <ActionBtn onClick={() => cameraRef.current?.click()} icon={<CameraIcon />} label="Camera" />
+          <ActionBtn onClick={() => videoRef.current?.click()}  icon={<VideoIcon />}  label="Video" />
+        </div>
+      ) : (
+        <p className="text-center text-xs text-gray-400 py-2">Max {maxTotal} items reached</p>
+      )}
+
+      {/* Hidden file inputs */}
+      {/* Gallery — multiple photos */}
       <input
-        ref={inputRef}
+        ref={galleryRef}
         type="file"
         accept="image/*"
-        onChange={handleFileSelect}
+        multiple
+        onChange={(e) => { handleFilePick(e.target.files); e.target.value = ""; }}
+        className="hidden"
+      />
+      {/* Camera — single live photo */}
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={(e) => { handleFilePick(e.target.files); e.target.value = ""; }}
+        className="hidden"
+      />
+      {/* Gallery — multiple videos */}
+      <input
+        ref={videoRef}
+        type="file"
+        accept="video/*"
+        multiple
+        onChange={(e) => { handleFilePick(e.target.files); e.target.value = ""; }}
         className="hidden"
       />
     </div>
+  );
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function Thumb({ src, isVideo, onRemove }: { src: string; isVideo: boolean; onRemove?: () => void }) {
+  return (
+    <div className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
+      {isVideo ? (
+        <video src={src} className="w-full h-full object-cover" muted playsInline />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" className="w-full h-full object-cover" />
+      )}
+      {isVideo && (
+        <div className="absolute bottom-1 left-1 bg-black/60 rounded px-1 py-0.5">
+          <VideoIcon size={10} />
+        </div>
+      )}
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute top-1 right-1 w-6 h-6 bg-black/60 hover:bg-black/80 text-white rounded-full flex items-center justify-center transition-colors"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ActionBtn({ onClick, icon, label }: { onClick: () => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 border-dashed border-gray-200 hover:border-blue-400 bg-gray-50 hover:bg-blue-50 text-gray-500 hover:text-blue-600 transition-colors text-xs font-medium"
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function PhotoIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  );
+}
+
+function CameraIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+        d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  );
+}
+
+function VideoIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+        d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+    </svg>
   );
 }
