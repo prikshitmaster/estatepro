@@ -13,6 +13,7 @@ import {
 } from "@/lib/db/secure-share";
 import { Property, ShareMediaType } from "@/lib/types";
 import { compressImage } from "@/lib/compress-image";
+import { compressVideo } from "@/lib/compress-video";
 
 // ── Helper: detect if a URL points to a video ────────────────────────────────
 const IS_VIDEO_URL = /\.(mp4|webm|mov|avi|mkv|ogv)(\?.*)?$/i;
@@ -162,11 +163,14 @@ export default function CreateShareLinkPage() {
         });
       }
 
-      // Compress images before uploading, then upload in parallel
+      // Compress images + videos before uploading (one at a time to save memory)
       if (files.length) {
-        const processed = await Promise.all(
-          files.map((f) => f.type.startsWith("image/") ? compressImage(f) : Promise.resolve(f))
-        );
+        const processed: File[] = [];
+        for (const f of files) {
+          if (f.type.startsWith("image/"))      processed.push(await compressImage(f));
+          else if (f.type.startsWith("video/")) processed.push(await compressVideo(f));
+          else                                   processed.push(f);
+        }
         const uploads = await Promise.all(
           processed.map((f) => uploadShareFile(user.id, link.id, f))
         );
