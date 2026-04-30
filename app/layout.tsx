@@ -1,6 +1,7 @@
 // app/layout.tsx — root layout for EstatePro CRM
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -28,7 +29,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${jakarta.variable} h-full`}>
-      <body className="min-h-full bg-[#F5F7FA] font-sans antialiased">{children}</body>
+      <body className="min-h-full bg-[#F5F7FA] font-sans antialiased">
+        {children}
+        <SpeedInsights />
+      </body>
     </html>
   );
 }
