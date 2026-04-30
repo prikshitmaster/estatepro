@@ -134,6 +134,16 @@ export default function DashboardPage() {
 
   const pendingTasks = todayTasks;
 
+  const overdueLeads = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return allLeads
+      .filter((l) =>
+        l.stage !== "closed" && l.stage !== "lost" &&
+        l.next_follow_up_at && l.next_follow_up_at.slice(0, 10) <= today
+      )
+      .slice(0, 4);
+  }, [allLeads]);
+
   // Close all dropdowns when clicking outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -421,6 +431,68 @@ export default function DashboardPage() {
       {/* ── Pipeline Funnel ── */}
       {dbConnected && allLeads.length > 0 && (
         <PipelineFunnelCard leads={allLeads} />
+      )}
+
+      {/* ── Today's Actions ── */}
+      {dbConnected && (overdueLeads.length > 0 || pendingTasks.length > 0) && (
+        <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #EEF1F6" }}>
+          <div className="flex items-center gap-2 px-5 py-3" style={{ borderBottom: "1px solid #EEF1F6" }}>
+            <svg className="w-4 h-4" fill="none" stroke="#F59E0B" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            <h2 className="font-semibold text-sm" style={{ color: "#1A1D23" }}>{"Today's Actions"}</h2>
+            <span className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "#FEF3C7", color: "#D97706" }}>
+              {overdueLeads.length + pendingTasks.length} items
+            </span>
+          </div>
+          <div className="grid sm:grid-cols-2" style={{ borderBottom: "1px solid #EEF1F6" }}>
+            {/* Overdue follow-ups */}
+            <div className="p-4" style={{ borderRight: "1px solid #EEF1F6" }}>
+              <p className="text-xs font-semibold mb-3" style={{ color: "#D97706" }}>
+                Overdue Follow-ups{overdueLeads.length > 0 ? ` (${overdueLeads.length})` : ""}
+              </p>
+              {overdueLeads.length === 0 ? (
+                <p className="text-xs text-gray-400">All caught up!</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {overdueLeads.map((l) => (
+                    <Link key={l.id} href={`/leads/${l.id}`} className="flex items-center gap-2.5 group">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-white text-[10px] font-bold" style={{ background: "#F59E0B" }}>
+                        {l.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-gray-900 truncate group-hover:text-amber-600 transition-colors">{l.name}</p>
+                        <p className="text-[10px] text-gray-400 truncate">{l.phone}</p>
+                      </div>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full capitalize shrink-0" style={{ background: "#FEF3C7", color: "#D97706" }}>{l.stage}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Pending tasks */}
+            <div className="p-4">
+              <p className="text-xs font-semibold mb-3" style={{ color: "#1BC47D" }}>
+                Pending Tasks{pendingTasks.length > 0 ? ` (${pendingTasks.length})` : ""}
+              </p>
+              {pendingTasks.length === 0 ? (
+                <p className="text-xs text-gray-400">No pending tasks.</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {pendingTasks.slice(0, 4).map((t) => (
+                    <Link key={t.id} href="/tasks" className="flex items-center gap-2.5 group">
+                      <div className={`w-2 h-2 rounded-full shrink-0 mt-0.5 ${t.priority === "high" ? "bg-red-500" : t.priority === "medium" ? "bg-amber-400" : "bg-green-400"}`} />
+                      <p className="text-xs font-medium text-gray-700 truncate flex-1 group-hover:text-green-600 transition-colors">{t.title}</p>
+                      {t.due_date && (
+                        <span className="text-[10px] text-gray-400 shrink-0">
+                          {new Date(t.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                        </span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Main content: Leads + Tasks ── */}

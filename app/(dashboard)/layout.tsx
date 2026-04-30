@@ -13,6 +13,7 @@ import AuthGuard from "../_components/AuthGuard";
 import Sidebar from "../_components/Sidebar";
 import MobileTopBar from "../_components/MobileTopBar";
 import MobileBottomNav from "../_components/MobileBottomNav";
+import QuickAction from "../_components/QuickAction";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -42,6 +43,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </div>
+
+      {/* Floating quick-action "+" button */}
+      <QuickAction />
     </AuthGuard>
   );
 }
