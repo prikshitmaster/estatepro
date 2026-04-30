@@ -387,9 +387,9 @@ export default function DashboardPage() {
           label="Follow Ups"
           value={dbConnected ? stats.activeFollowUps : "—"}
           accent="amber"
-          trend="↑ 8% increase"
+          trend={overdueLeads.length > 0 ? `${overdueLeads.length} overdue` : "All caught up"}
           icon={<FollowUpIcon />}
-          footer={<div className="w-full bg-gray-100 rounded-full h-1.5"><div className="bg-amber-400 h-1.5 rounded-full" style={{ width: "62%" }} /></div>}
+          footer={<Link href="/follow-ups" className="text-xs font-semibold text-amber-600 hover:underline">View call logs →</Link>}
         />
 
         <StatCard
@@ -398,7 +398,7 @@ export default function DashboardPage() {
           accent="violet"
           trend="In negotiation"
           icon={<DealIcon />}
-          footer={<div className="w-full bg-gray-100 rounded-full h-1.5"><div className="bg-violet-500 h-1.5 rounded-full" style={{ width: "40%" }} /></div>}
+          footer={<Link href="/leads" className="text-xs font-semibold text-violet-600 hover:underline">View leads →</Link>}
         />
 
         {/* Commission card — always shows (estimated) */}
@@ -427,11 +427,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-
-      {/* ── Pipeline Funnel ── */}
-      {dbConnected && allLeads.length > 0 && (
-        <PipelineFunnelCard leads={allLeads} />
-      )}
 
       {/* ── Today's Actions ── */}
       {dbConnected && (overdueLeads.length > 0 || pendingTasks.length > 0) && (
@@ -539,9 +534,6 @@ export default function DashboardPage() {
                   <thead>
                     <tr style={{ borderBottom: '1px solid #F0F3F8' }}>
                       <th className="px-5 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">Name</th>
-                      <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">Location</th>
-                      <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">Type</th>
-                      <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">Budget</th>
                       <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">Stage</th>
                       <th className="px-4 py-3"></th>
                     </tr>
@@ -560,9 +552,6 @@ export default function DashboardPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-xs text-gray-500">{lead.location}</td>
-                        <td className="px-4 py-3 text-xs text-gray-500">{lead.property_interest ?? "—"}</td>
-                        <td className="px-4 py-3 text-xs text-gray-500">{formatPrice(lead.budget_max)}</td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize ${STAGE_STYLE[lead.stage]}`}>{lead.stage}</span>
                         </td>
@@ -600,126 +589,51 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Today's Tasks */}
+        {/* Stats + Quick Links */}
         <div className="bg-white rounded-2xl overflow-hidden flex flex-col" style={{ border: '1px solid #EEF1F6' }}>
-          <div className="grid grid-cols-3 divide-x border-b" style={{ borderColor: '#EEF1F6' }}>
+          {/* Mini stats */}
+          <div className="grid grid-cols-3 divide-x" style={{ borderBottom: '1px solid #EEF1F6', borderColor: '#EEF1F6' }}>
             <div className="px-3 py-3 text-center">
-              <p className="text-xl font-bold text-gray-900">
-                {dbConnected ? stats.total : "—"}
-              </p>
+              <p className="text-xl font-bold text-gray-900">{dbConnected ? stats.total : "—"}</p>
               <p className="text-[10px] text-gray-400 mt-0.5">Leads</p>
             </div>
             <div className="px-3 py-3 text-center">
-              <p className="text-xl font-bold text-gray-900">
-                {dbConnected ? clientCount : "—"}
-              </p>
+              <p className="text-xl font-bold text-gray-900">{dbConnected ? clientCount : "—"}</p>
               <p className="text-[10px] text-gray-400 mt-0.5">Clients</p>
             </div>
             <div className="px-3 py-3 text-center">
-              <p className="text-base font-bold text-gray-900 leading-tight">
-                {dbConnected ? formatPrice(stats.pipelineValue) : "—"}
-              </p>
+              <p className="text-base font-bold text-gray-900 leading-tight">{dbConnected ? formatPrice(stats.pipelineValue) : "—"}</p>
               <p className="text-[10px] text-gray-400 mt-0.5">Pipeline</p>
             </div>
           </div>
 
-          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #EEF1F6' }}>
-            <h2 className="font-semibold text-sm" style={{ color: '#1A1D23' }}>Today&apos;s Tasks</h2>
-            <span className="text-[11px] text-gray-400">{pendingTasks.length} pending</span>
-          </div>
-
-          <div className="flex flex-col divide-y divide-[#F0F3F8] flex-1">
-            {todayTasks.length === 0 && dbConnected && (
-              <p className="text-xs text-gray-400 text-center py-6">No pending tasks.</p>
-            )}
-            {todayTasks.map((task, i) => (
-              <TaskItem key={task.id} task={task} index={i} />
-            ))}
-          </div>
-
-          <div className="px-4 py-3" style={{ borderTop: '1px solid #F0F3F8' }}>
-            <Link href="/tasks" className="w-full text-xs font-medium hover:underline text-center block" style={{ color: '#1BC47D' }}>
-              View all tasks →
-            </Link>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  );
-}
-
-// ── Pipeline Funnel Card ──────────────────────────────────────────────────────
-
-const FUNNEL_STAGES = [
-  { stage: "new",         label: "New",         bar: "bg-blue-500",    text: "text-blue-600"    },
-  { stage: "contacted",   label: "Contacted",   bar: "bg-amber-500",   text: "text-amber-600"   },
-  { stage: "viewing",     label: "Viewing",     bar: "bg-violet-500",  text: "text-violet-600"  },
-  { stage: "negotiating", label: "Negotiating", bar: "bg-orange-500",  text: "text-orange-600"  },
-  { stage: "closed",      label: "Won ✓",       bar: "bg-emerald-500", text: "text-emerald-600" },
-] as const;
-
-function PipelineFunnelCard({ leads }: { leads: Lead[] }) {
-  const pipeline = useMemo(() => FUNNEL_STAGES.map((s) => ({
-    ...s,
-    count: leads.filter((l) => l.stage === s.stage).length,
-  })), [leads]);
-
-  const topCount = Math.max(...pipeline.map((p) => p.count), 1);
-  const total    = leads.length;
-  const closed   = pipeline.find((p) => p.stage === "closed")?.count ?? 0;
-  const convRate = total > 0 ? Math.round((closed / total) * 100) : 0;
-
-  return (
-    <div className="bg-white rounded-2xl px-5 py-4" style={{ border: '1px solid #EEF1F6' }}>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="font-semibold text-gray-900 text-sm">Conversion Funnel</h2>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {total} total leads
-            <span className="mx-1.5 text-gray-200">·</span>
-            <span className="font-semibold text-emerald-600">{convRate}% close rate</span>
-          </p>
-        </div>
-        <Link href="/analytics" className="text-xs hover:underline font-medium" style={{ color: '#1BC47D' }}>
-          Full analytics →
-        </Link>
-      </div>
-
-      {/* Funnel bars */}
-      <div className="flex flex-col gap-3">
-        {pipeline.map(({ stage, label, bar, text, count }) => {
-          const barWidth  = Math.round((count / topCount) * 100);
-          const pctOfAll  = total > 0 ? Math.round((count / total) * 100) : 0;
-          return (
-            <div key={stage} className="flex items-center gap-3">
-              <p className={`text-[11px] font-bold w-[88px] shrink-0 ${text}`}>{label}</p>
-              <div className="flex-1 bg-[#F0F3F8] rounded-full h-2.5 overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${bar} transition-all duration-700`}
-                  style={{ width: `${barWidth}%` }}
-                />
-              </div>
-              <div className="flex items-baseline gap-1.5 shrink-0 w-14 justify-end">
-                <span className="text-sm font-bold text-gray-800">{count}</span>
-                <span className="text-[10px] text-gray-400">{pctOfAll}%</span>
-              </div>
+          {/* Quick Links */}
+          <div className="px-4 py-4 flex-1">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Quick Actions</p>
+            <div className="space-y-0.5">
+              {[
+                { label: "Add New Lead",       href: "/leads/new",           color: "#1BC47D" },
+                { label: "Add Property",       href: "/properties/new",      color: "#1BC47D" },
+                { label: "Create Share Link",  href: "/secure-share/create", color: "#6366F1" },
+                { label: "Log a Call",         href: "/follow-ups",          color: "#F59E0B" },
+                { label: "View Analytics",     href: "/analytics",           color: "#6B7280" },
+              ].map(({ label, href, color }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-[#F5F7FA] transition-colors group"
+                >
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{label}</span>
+                  <svg className="w-3.5 h-3.5 opacity-50 group-hover:opacity-100 transition-opacity" style={{ color }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              ))}
             </div>
-          );
-        })}
+          </div>
+        </div>
       </div>
 
-      {/* Drop-off hint */}
-      {pipeline[0].count > 0 && pipeline[4].count === 0 && (
-        <p className="text-[11px] text-amber-600 mt-3 bg-amber-50 px-3 py-2 rounded-lg">
-          💡 No closed deals yet — keep pushing leads through the pipeline.
-        </p>
-      )}
-      {convRate >= 20 && (
-        <p className="text-[11px] text-emerald-600 mt-3 bg-emerald-50 px-3 py-2 rounded-lg">
-          🎯 Strong {convRate}% close rate — top quartile for real estate brokers.
-        </p>
-      )}
     </div>
   );
 }
