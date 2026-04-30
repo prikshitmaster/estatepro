@@ -7,7 +7,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { deleteProperty, uploadPropertyMedia, deletePropertyMediaFile, updateProperty } from "@/lib/db/properties";
 import { compressVideo } from "@/lib/compress-video";
-import { formatPrice } from "@/lib/mock-data";
+import { formatPriceFull } from "@/lib/format-price";
 import { Property, PropertyStatus } from "@/lib/types";
 
 const STATUS_STYLE: Record<PropertyStatus, string> = {
@@ -212,14 +212,65 @@ export default function PropertyDetailPage({ params }: Props) {
       {/* Media carousel */}
       {allMedia.length > 0 && <MediaCarousel urls={allMedia} />}
 
-      {/* Details card */}
+      {/* ── Price highlight ── */}
+      <div className="mb-4 px-5 py-4 rounded-2xl" style={{ background: "#F0FDF9", border: "1px solid #BBF7D0" }}>
+        <p className="text-xs font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#15803D" }}>Price</p>
+        <p className="text-2xl font-bold" style={{ color: "#166534" }}>{formatPriceFull(property.price)}</p>
+      </div>
+
+      {/* ── Details card ── */}
       <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-100">
+
+        {/* Basic info */}
         <Section title="Property Info">
           <Row label="Type"     value={typeLabel[property.type]} />
           <Row label="Location" value={property.location} />
-          <Row label="Price"    value={<span className="text-blue-600 font-bold">{formatPrice(property.price)}</span>} />
-          <Row label="Status"   value={<span className="capitalize">{property.status}</span>} />
+          <Row label="Status"   value={<span className="capitalize">{property.status.replace("-", " ")}</span>} />
         </Section>
+
+        {/* Specifications — only render if at least one spec exists */}
+        {(property.area_sqft || property.bedrooms || property.bathrooms || property.furnishing || property.parking !== undefined || property.floor_no || property.facing || property.possession) && (
+          <Section title="Specifications">
+            {property.bedrooms    && <Row label="Configuration" value={property.bedrooms} />}
+            {property.area_sqft   && <Row label="Area"          value={`${property.area_sqft.toLocaleString("en-IN")} sq ft`} />}
+            {property.furnishing  && <Row label="Furnishing"    value={property.furnishing} />}
+            {property.bathrooms   && <Row label="Bathrooms"     value={String(property.bathrooms)} />}
+            {property.parking !== undefined && <Row label="Parking" value={property.parking === 0 ? "No parking" : `${property.parking} spot${property.parking > 1 ? "s" : ""}`} />}
+            {(property.floor_no || property.total_floors) && (
+              <Row label="Floor" value={
+                property.floor_no && property.total_floors
+                  ? `${property.floor_no} of ${property.total_floors}`
+                  : property.floor_no ? String(property.floor_no)
+                  : `of ${property.total_floors}`
+              } />
+            )}
+            {property.facing     && <Row label="Facing"     value={property.facing} />}
+            {property.possession && <Row label="Possession" value={property.possession} />}
+          </Section>
+        )}
+
+        {/* Amenities */}
+        {property.amenities && property.amenities.length > 0 && (
+          <Section title={`Amenities (${property.amenities.length})`}>
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {property.amenities.map((a) => (
+                <span key={a} className="px-2.5 py-1 rounded-lg text-xs font-medium"
+                  style={{ background: "#F0FDF9", color: "#15803D", border: "1px solid #BBF7D0" }}>
+                  ✓ {a}
+                </span>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* Description */}
+        {property.description && (
+          <Section title="Description">
+            <p className="text-sm leading-relaxed pt-1" style={{ color: "#374151" }}>{property.description}</p>
+          </Section>
+        )}
+
+        {/* Meta */}
         {property.created_at && (
           <Section title="Info">
             <Row label="Added on" value={new Date(property.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })} />

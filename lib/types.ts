@@ -38,6 +38,18 @@ export interface Property {
   image_url?: string;         // cover photo (first item of media_urls)
   media_urls?: string[];      // all photos + videos (up to 8)
   media_processing?: boolean; // true = original video uploaded, compression running in background
+  // ── Optional property details ─────────────────────────────────────────────
+  area_sqft?:    number;      // e.g. 1200
+  bedrooms?:     string;      // "1 BHK", "2 BHK", "Studio" etc.
+  bathrooms?:    number;      // 1, 2, 3
+  furnishing?:   string;      // "Unfurnished" / "Semi-Furnished" / "Fully Furnished"
+  parking?:      number;      // 0, 1, 2
+  floor_no?:     number;      // floor the unit is on
+  total_floors?: number;      // total floors in building
+  facing?:       string;      // "East", "North-East" etc.
+  possession?:   string;      // "Ready to Move" / "Under Construction"
+  amenities?:    string[];    // ["Gym", "Pool", ...]
+  description?:  string;      // free-text
   created_at?: string;
 }
 
