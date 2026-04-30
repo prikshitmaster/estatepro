@@ -496,7 +496,7 @@ export default function DashboardPage() {
         {/* Leads Pipeline */}
         <div className="lg:col-span-2 bg-white rounded-2xl overflow-hidden" style={{ border: '1px solid #EEF1F6' }}>
           <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #EEF1F6' }}>
-            <h2 className="font-semibold text-sm" style={{ color: '#1A1D23' }}>Leads Pipeline</h2>
+            <h2 className="font-semibold text-sm" style={{ color: '#1A1D23' }}>My Leads</h2>
             <Link href="/leads/new" className="flex items-center gap-1.5 px-3 py-1.5 text-white text-xs font-semibold rounded-lg transition-colors" style={{ background: '#1BC47D' }}>
               <PlusIcon /> Add Lead
             </Link>
@@ -534,6 +534,7 @@ export default function DashboardPage() {
                   <thead>
                     <tr style={{ borderBottom: '1px solid #F0F3F8' }}>
                       <th className="px-5 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">Name</th>
+                      <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">Deal Value</th>
                       <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">Stage</th>
                       <th className="px-4 py-3"></th>
                     </tr>
@@ -552,8 +553,9 @@ export default function DashboardPage() {
                             </div>
                           </div>
                         </td>
+                        <td className="px-4 py-3 text-xs font-semibold text-gray-700">{formatPrice(lead.budget_max)}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize ${STAGE_STYLE[lead.stage]}`}>{lead.stage}</span>
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${STAGE_STYLE[lead.stage]}`}>{STAGE_LABEL[lead.stage] ?? lead.stage}</span>
                         </td>
                         <td className="px-4 py-3">
                           <Link href={`/leads/${lead.id}`} className="w-6 h-6 inline-flex items-center justify-center rounded-lg hover:bg-[#F0FDF4] text-gray-400 hover:text-[#1BC47D] transition-colors">
@@ -575,7 +577,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-900 truncate">{lead.name}</p>
-                      <p className="text-xs text-gray-400 truncate">{lead.location} · {lead.property_interest}</p>
+                      <p className="text-xs text-gray-400 truncate">{lead.phone} · {formatPrice(lead.budget_max)}</p>
                     </div>
                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold capitalize shrink-0 ${STAGE_STYLE[lead.stage]}`}>{lead.stage}</span>
                   </Link>
