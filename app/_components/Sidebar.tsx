@@ -11,19 +11,19 @@ import { getFollowUpLogs } from "@/lib/db/follow-ups";
 // ── Nav item definitions ───────────────────────────────────────────────────────
 
 const mainItems = [
-  { label: "Dashboard",    href: "/dashboard",    icon: DashboardIcon,  accent: "#1BC47D" },
-  { label: "Leads",        href: "/leads",        icon: LeadsIcon,      accent: "#1BC47D" },
-  { label: "Call Logs",    href: "/follow-ups",   icon: FollowUpIcon,   accent: "#1BC47D" },
-  { label: "Tasks",        href: "/tasks",        icon: TasksIcon,      accent: "#1BC47D" },
+  { label: "Dashboard",         href: "/dashboard",    icon: DashboardIcon,  accent: "#1BC47D" },
+  { label: "Leads",             href: "/leads",        icon: LeadsIcon,      accent: "#1BC47D" },
+  { label: "My Calls",          href: "/follow-ups",   icon: FollowUpIcon,   accent: "#1BC47D" },
+  { label: "Reminders",         href: "/tasks",        icon: TasksIcon,      accent: "#1BC47D" },
 ];
 
 const toolItems = [
-  { label: "Properties",   href: "/properties",   icon: PropertiesIcon,  accent: "#1BC47D" },
-  { label: "Clients",      href: "/clients",      icon: ClientsIcon,     accent: "#1BC47D" },
-  { label: "Analytics",    href: "/analytics",    icon: AnalyticsIcon,   accent: "#1BC47D" },
-  { label: "AI Tools",     href: "/ai-tools",     icon: AIIcon,          accent: "#1BC47D" },
-  { label: "Secure Share", href: "/secure-share", icon: SecureShareIcon, accent: "#6366F1" },
-  { label: "Import Leads", href: "/newspaper",    icon: NewspaperIcon,   accent: "#1BC47D" },
+  { label: "Properties",        href: "/properties",   icon: PropertiesIcon,  accent: "#1BC47D" },
+  { label: "Clients",           href: "/clients",      icon: ClientsIcon,     accent: "#1BC47D" },
+  { label: "Reports",           href: "/analytics",    icon: AnalyticsIcon,   accent: "#1BC47D" },
+  { label: "Message Templates", href: "/ai-tools",     icon: AIIcon,          accent: "#1BC47D" },
+  { label: "Property Links",    href: "/secure-share", icon: SecureShareIcon, accent: "#6366F1" },
+  { label: "Find Leads",        href: "/newspaper",    icon: NewspaperIcon,   accent: "#1BC47D" },
 ];
 
 function getInitials(name: string): string {

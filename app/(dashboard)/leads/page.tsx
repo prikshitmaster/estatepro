@@ -15,7 +15,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { getAllLeads, updateLead } from "@/lib/db/leads";
-import { formatPrice, initials } from "@/lib/mock-data";
+import { formatPrice, initials, STAGE_LABEL } from "@/lib/mock-data";
 import { Lead, LeadStage } from "@/lib/types";
 
 const STAGE_STYLE: Record<LeadStage, string> = {
@@ -35,13 +35,13 @@ const AVATAR_COLORS = [
 ];
 
 const stageFilters: { label: string; value: LeadStage | "all" }[] = [
-  { label: "All",         value: "all"         },
-  { label: "New",         value: "new"         },
-  { label: "Contacted",   value: "contacted"   },
-  { label: "Viewing",     value: "viewing"     },
-  { label: "Negotiating", value: "negotiating" },
-  { label: "Closed",      value: "closed"      },
-  { label: "Lost",        value: "lost"        },
+  { label: "All",            value: "all"         },
+  { label: "New Enquiry",    value: "new"         },
+  { label: "Contacted",      value: "contacted"   },
+  { label: "Site Visit",     value: "viewing"     },
+  { label: "In Talks",       value: "negotiating" },
+  { label: "Deal Done",      value: "closed"      },
+  { label: "Not Interested", value: "lost"        },
 ];
 
 export default function LeadsPage() {
@@ -256,9 +256,9 @@ function StageBadge({
     <div ref={ref} className="relative shrink-0">
       <button
         onClick={(e) => { e.stopPropagation(); setIsOpen((v) => !v); }}
-        className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize flex items-center gap-1 ${STAGE_STYLE[lead.stage]}`}
+        className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${STAGE_STYLE[lead.stage]}`}
       >
-        {lead.stage}
+        {STAGE_LABEL[lead.stage] ?? lead.stage}
         <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -274,7 +274,7 @@ function StageBadge({
                 setIsOpen(false);
                 onStageChange(lead.id, stage);
               }}
-              className="w-full text-left px-3 py-2 text-xs font-medium capitalize flex items-center gap-2 hover:bg-[#F8F9FB] transition-colors"
+              className="w-full text-left px-3 py-2 text-xs font-medium flex items-center gap-2 hover:bg-[#F8F9FB] transition-colors"
               style={{ color: lead.stage === stage ? '#1BC47D' : '#374151' }}
             >
               <span className={`w-2 h-2 rounded-full shrink-0 ${
@@ -284,7 +284,7 @@ function StageBadge({
                 stage === "negotiating" ? "bg-orange-400" :
                 stage === "closed" ? "bg-green-400" : "bg-red-400"
               }`} />
-              {stage}
+              {STAGE_LABEL[stage] ?? stage}
               {lead.stage === stage && (
                 <svg className="w-3 h-3 ml-auto" style={{ color: '#1BC47D' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />

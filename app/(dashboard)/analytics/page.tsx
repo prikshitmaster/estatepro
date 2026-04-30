@@ -198,7 +198,7 @@ export default function AnalyticsPage() {
 
       {/* ── Page header ── */}
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Analytics</h1>
+        <h1 className="text-xl font-bold text-gray-900">Reports</h1>
         <p className="text-sm text-gray-400 mt-0.5">Business performance overview</p>
       </div>
 

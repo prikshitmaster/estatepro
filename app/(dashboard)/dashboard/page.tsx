@@ -14,7 +14,7 @@ import { getAllLeads, getDashboardStats } from "@/lib/db/leads";
 import { getAllTasks } from "@/lib/db/tasks";
 import { getAllClients } from "@/lib/db/clients";
 import { getAllNewspaperLeads } from "@/lib/db/newspaper-leads";
-import { formatPrice, initials } from "@/lib/mock-data";
+import { formatPrice, initials, STAGE_LABEL } from "@/lib/mock-data";
 import { Lead, LeadStage, Task, TaskPriority, NewspaperLead } from "@/lib/types";
 
 // ── colour maps ───────────────────────────────────────────────────────────────
@@ -252,7 +252,7 @@ export default function DashboardPage() {
             {notifOpen && (
               <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                  <p className="text-sm font-bold text-gray-900">Newspaper Leads</p>
+                  <p className="text-sm font-bold text-gray-900">Lead Sources</p>
                   <span className="text-[10px] font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
                     {newsLeads.length} latest
                   </span>
@@ -348,7 +348,7 @@ export default function DashboardPage() {
                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
                     </svg>
-                    Newspaper Leads
+                    Find Leads
                   </Link>
                 </div>
 
@@ -384,19 +384,19 @@ export default function DashboardPage() {
         />
 
         <StatCard
-          label="Follow Ups"
+          label="Need to Call"
           value={dbConnected ? stats.activeFollowUps : "—"}
           accent="amber"
           trend={overdueLeads.length > 0 ? `${overdueLeads.length} overdue` : "All caught up"}
           icon={<FollowUpIcon />}
-          footer={<Link href="/follow-ups" className="text-xs font-semibold text-amber-600 hover:underline">View call logs →</Link>}
+          footer={<Link href="/follow-ups" className="text-xs font-semibold text-amber-600 hover:underline">View my calls →</Link>}
         />
 
         <StatCard
-          label="Active Deals"
+          label="In Talks"
           value={dbConnected ? stats.activeDeals : "—"}
           accent="violet"
-          trend="In negotiation"
+          trend="Negotiating deals"
           icon={<DealIcon />}
           footer={<Link href="/leads" className="text-xs font-semibold text-violet-600 hover:underline">View leads →</Link>}
         />
@@ -442,7 +442,7 @@ export default function DashboardPage() {
             {/* Overdue follow-ups */}
             <div className="p-4" style={{ borderRight: "1px solid #EEF1F6" }}>
               <p className="text-xs font-semibold mb-3" style={{ color: "#D97706" }}>
-                Overdue Follow-ups{overdueLeads.length > 0 ? ` (${overdueLeads.length})` : ""}
+                Call These Now{overdueLeads.length > 0 ? ` (${overdueLeads.length})` : ""}
               </p>
               {overdueLeads.length === 0 ? (
                 <p className="text-xs text-gray-400">All caught up!</p>
@@ -457,7 +457,7 @@ export default function DashboardPage() {
                         <p className="text-xs font-semibold text-gray-900 truncate group-hover:text-amber-600 transition-colors">{l.name}</p>
                         <p className="text-[10px] text-gray-400 truncate">{l.phone}</p>
                       </div>
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full capitalize shrink-0" style={{ background: "#FEF3C7", color: "#D97706" }}>{l.stage}</span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: "#FEF3C7", color: "#D97706" }}>{STAGE_LABEL[l.stage] ?? l.stage}</span>
                     </Link>
                   ))}
                 </div>

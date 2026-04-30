@@ -250,7 +250,7 @@ export default function AIToolsPage() {
 
       {/* ── Header ── */}
       <div>
-        <h1 className="text-xl font-bold text-gray-900">AI Tools</h1>
+        <h1 className="text-xl font-bold text-gray-900">Message Templates</h1>
         <p className="text-sm text-gray-400 mt-0.5">
           Generate personalised follow-up messages for your leads instantly
         </p>

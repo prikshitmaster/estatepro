@@ -85,7 +85,7 @@ export default function SecureSharePage() {
             <LockIcon color={ACCENT} />
           </div>
           <div>
-            <h1 className="text-xl font-bold" style={{ color: '#1A1D23' }}>Secure Share</h1>
+            <h1 className="text-xl font-bold" style={{ color: '#1A1D23' }}>Property Links</h1>
             <p className="text-sm" style={{ color: '#6B7280' }}>Share property media via protected links</p>
           </div>
         </div>

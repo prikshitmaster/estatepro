@@ -13,12 +13,12 @@ interface Props { params: Promise<{ id: string }> }
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const STAGES: { value: LeadStage; label: string; color: string; dot: string }[] = [
-  { value: "new",         label: "New",         color: "bg-blue-100 text-blue-700 border-blue-300",     dot: "bg-blue-500"   },
-  { value: "contacted",   label: "Contacted",   color: "bg-amber-100 text-amber-700 border-amber-300",   dot: "bg-amber-500"  },
-  { value: "viewing",     label: "Viewing",     color: "bg-violet-100 text-violet-700 border-violet-300", dot: "bg-violet-500" },
-  { value: "negotiating", label: "Negotiating", color: "bg-orange-100 text-orange-700 border-orange-300", dot: "bg-orange-500" },
-  { value: "closed",      label: "Won ✓",       color: "bg-emerald-100 text-emerald-700 border-emerald-300", dot: "bg-emerald-500" },
-  { value: "lost",        label: "Lost",        color: "bg-red-100 text-red-600 border-red-300",         dot: "bg-red-400"    },
+  { value: "new",         label: "New Enquiry",    color: "bg-blue-100 text-blue-700 border-blue-300",       dot: "bg-blue-500"   },
+  { value: "contacted",   label: "Contacted",      color: "bg-amber-100 text-amber-700 border-amber-300",    dot: "bg-amber-500"  },
+  { value: "viewing",     label: "Site Visit",     color: "bg-violet-100 text-violet-700 border-violet-300", dot: "bg-violet-500" },
+  { value: "negotiating", label: "In Talks",       color: "bg-orange-100 text-orange-700 border-orange-300", dot: "bg-orange-500" },
+  { value: "closed",      label: "Deal Done",      color: "bg-emerald-100 text-emerald-700 border-emerald-300", dot: "bg-emerald-500" },
+  { value: "lost",        label: "Not Interested", color: "bg-red-100 text-red-600 border-red-300",          dot: "bg-red-400"    },
 ];
 
 const PROPERTY_TYPES = ["1BHK", "2BHK", "3BHK", "4BHK", "Villa", "Plot", "Commercial"];

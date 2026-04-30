@@ -486,7 +486,7 @@ export default function NewspaperPage() {
       {/* ── Page header ── */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Newspaper Leads</h1>
+          <h1 className="text-xl font-bold text-gray-900">Find Leads</h1>
           <p className="text-sm text-gray-500 mt-0.5">Fresh property leads sourced daily</p>
         </div>
         <div className="flex items-center gap-2">

@@ -7,8 +7,8 @@ import { usePathname } from "next/navigation";
 const tabs = [
   { label: "Home",       href: "/dashboard",    icon: HomeIcon     },
   { label: "Leads",      href: "/leads",        icon: UsersIcon    },
-  { label: "Tasks",      href: "/tasks",        icon: TasksIcon    },
-  { label: "Calls",      href: "/follow-ups",   icon: PhoneIcon    },
+  { label: "Reminders",  href: "/tasks",        icon: TasksIcon    },
+  { label: "My Calls",   href: "/follow-ups",   icon: PhoneIcon    },
   { label: "Properties", href: "/properties",   icon: BuildingIcon },
 ];
 

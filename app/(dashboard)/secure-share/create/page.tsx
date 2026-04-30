@@ -264,7 +264,7 @@ export default function CreateShareLinkPage() {
           <BackIcon />
         </Link>
         <div>
-          <h1 className="text-xl font-bold" style={{ color: '#1A1D23' }}>Create Share Link</h1>
+          <h1 className="text-xl font-bold" style={{ color: '#1A1D23' }}>Share Property</h1>
           <p className="text-sm" style={{ color: '#6B7280' }}>Upload files and generate a secure viewer link</p>
         </div>
       </div>

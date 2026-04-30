@@ -372,7 +372,7 @@ export default function FollowUpsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Follow-Ups</h1>
+          <h1 className="text-xl font-bold text-gray-900">My Calls</h1>
           <p className="text-sm text-gray-400 mt-0.5">Log every call. Never miss a lead.</p>
         </div>
         <Link href="/leads" className="px-4 py-2 bg-gray-100 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-200">

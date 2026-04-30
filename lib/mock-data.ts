@@ -25,3 +25,12 @@ export function initials(name: string): string {
     .join("")
     .toUpperCase();
 }
+
+export const STAGE_LABEL: Record<string, string> = {
+  new:         "New Enquiry",
+  contacted:   "Contacted",
+  viewing:     "Site Visit",
+  negotiating: "In Talks",
+  closed:      "Deal Done",
+  lost:        "Not Interested",
+};

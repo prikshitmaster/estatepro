@@ -176,7 +176,7 @@ export default function TasksPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Tasks</h1>
+          <h1 className="text-xl font-bold text-gray-900">Reminders</h1>
           <p className="text-sm text-gray-400 mt-0.5">
             {pendingCount} pending · {tasks.length} total
           </p>
