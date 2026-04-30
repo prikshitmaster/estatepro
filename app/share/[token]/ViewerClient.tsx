@@ -22,10 +22,11 @@ export default function ViewerClient() {
   const params = useParams();
   const token  = params?.token as string;
 
-  const [data,    setData]    = useState<ViewerData | null>(null);
-  const [error,   setError]   = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [active,  setActive]  = useState(0);
+  const [data,      setData]      = useState<ViewerData | null>(null);
+  const [error,     setError]     = useState<string | null>(null);
+  const [loading,   setLoading]   = useState(true);
+  const [active,    setActive]    = useState(0);
+  const [focused,   setFocused]   = useState(true); // false = blur shield active
 
   useEffect(() => {
     if (!token) return;
@@ -56,10 +57,22 @@ export default function ViewerClient() {
     document.addEventListener("keydown",     keys);
     document.addEventListener("contextmenu", stop);
     document.addEventListener("dragstart",   stop);
+
+    // Blur shield — instantly hides content when user switches window / alt-tabs
+    const hide = () => setFocused(false);
+    const show = () => setFocused(true);
+    const visChange = () => document.hidden ? setFocused(false) : setFocused(true);
+    window.addEventListener("blur",             hide);
+    window.addEventListener("focus",            show);
+    document.addEventListener("visibilitychange", visChange);
+
     return () => {
-      document.removeEventListener("keydown",     keys);
-      document.removeEventListener("contextmenu", stop);
-      document.removeEventListener("dragstart",   stop);
+      document.removeEventListener("keydown",           keys);
+      document.removeEventListener("contextmenu",       stop);
+      document.removeEventListener("dragstart",         stop);
+      window.removeEventListener("blur",                hide);
+      window.removeEventListener("focus",               show);
+      document.removeEventListener("visibilitychange",  visChange);
     };
   }, [go]);
 
@@ -112,6 +125,29 @@ export default function ViewerClient() {
           fontFamily: "system-ui, -apple-system, sans-serif",
         }}
       >
+        {/* ── BLUR SHIELD — covers content when window loses focus ── */}
+        {!focused && (
+          <div
+            style={{
+              position:       "absolute",
+              inset:          0,
+              zIndex:         30,
+              backdropFilter: "blur(32px)",
+              WebkitBackdropFilter: "blur(32px)",
+              background:     "rgba(0,0,0,0.72)",
+              display:        "flex",
+              flexDirection:  "column",
+              alignItems:     "center",
+              justifyContent: "center",
+              gap:            12,
+            }}
+          >
+            <div style={{ fontSize: 40 }}>🔒</div>
+            <p style={{ color: "#fff", fontWeight: 700, fontSize: 16 }}>Content hidden</p>
+            <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 13 }}>Click here to continue viewing</p>
+          </div>
+        )}
+
         {/* ── WATERMARK — tiles perfectly across the entire screen ── */}
         {data.watermark_enabled && (
           <div
