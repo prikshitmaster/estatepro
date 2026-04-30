@@ -3,7 +3,6 @@
 
 import { useRef, useState } from "react";
 import { compressImage } from "@/lib/compress-image";
-import { compressVideo } from "@/lib/compress-video";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const VIDEO_EXT = /\.(mp4|webm|mov|avi|mkv|ogv)(\?.*)?$/i;
@@ -34,10 +33,8 @@ export default function ImageUpload({
   const cameraRef  = useRef<HTMLInputElement>(null);
   const videoRef   = useRef<HTMLInputElement>(null);
 
-  const [newItems,       setNewItems]       = useState<NewItem[]>([]);
-  const [compressing,    setCompressing]    = useState(false);
-  const [compressLabel,  setCompressLabel]  = useState(""); // shown inside the spinner
-  const [videoProgress,  setVideoProgress]  = useState(0);  // 0-100 for video encoding
+  const [newItems,    setNewItems]    = useState<NewItem[]>([]);
+  const [compressing, setCompressing] = useState(false);
 
   const totalCount = existingUrls.length + newItems.length;
   const canAdd     = totalCount < maxTotal;
@@ -49,23 +46,12 @@ export default function ImageUpload({
     if (raw.length === 0) return;
 
     setCompressing(true);
-    setVideoProgress(0);
     try {
       const processed: File[] = [];
-
       for (const f of raw) {
-        if (isVideoFile(f)) {
-          // Videos: compress with ffmpeg.wasm — show loading + progress bar
-          setCompressLabel(`Compressing video${raw.length > 1 ? "" : ""}…`);
-          setVideoProgress(0);
-          const compressed = await compressVideo(f, (pct) => setVideoProgress(pct));
-          processed.push(compressed);
-        } else {
-          // Images: quick Canvas compression
-          setCompressLabel("Compressing photo…");
-          const compressed = await compressImage(f);
-          processed.push(compressed);
-        }
+        // Images: compress instantly in browser (Canvas)
+        // Videos: pass through as-is — compression runs in background after save
+        processed.push(isVideoFile(f) ? f : await compressImage(f));
       }
 
       const added: NewItem[] = processed.map((file) => ({
@@ -79,8 +65,6 @@ export default function ImageUpload({
       onFilesChange(updated.map((i) => i.file));
     } finally {
       setCompressing(false);
-      setCompressLabel("");
-      setVideoProgress(0);
     }
   }
 
@@ -124,29 +108,15 @@ export default function ImageUpload({
         </div>
       )}
 
-      {/* Compression indicator — image: simple spinner | video: progress bar */}
+      {/* Compression spinner — shown while images are being compressed */}
       {compressing && (
-        <div className="mb-3 rounded-xl overflow-hidden border border-blue-100 bg-blue-50 px-4 py-3">
-          <div className="flex items-center gap-2 mb-1.5">
-            <svg className="w-3.5 h-3.5 text-blue-500 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-            </svg>
-            <p className="text-xs font-medium text-blue-600">{compressLabel || "Compressing…"}</p>
-            {videoProgress > 0 && (
-              <span className="ml-auto text-xs font-bold text-blue-500">{videoProgress}%</span>
-            )}
-          </div>
-          {/* Progress bar — only shown during video compression */}
-          {videoProgress > 0 && (
-            <div className="h-1.5 rounded-full bg-blue-100 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-blue-500 transition-all duration-300"
-                style={{ width: `${videoProgress}%` }}
-              />
-            </div>
-          )}
-        </div>
+        <p className="text-xs text-blue-500 text-center py-1 mb-2 flex items-center justify-center gap-1.5">
+          <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+          Compressing photo…
+        </p>
       )}
 
       {/* Action buttons */}
@@ -162,7 +132,7 @@ export default function ImageUpload({
 
       {/* Info tip */}
       <p className="text-[11px] text-gray-400 mt-1.5 text-center">
-        Photos &amp; videos auto-compressed before upload
+        Photos compressed instantly · Videos optimised after saving
       </p>
 
       {/* Hidden file inputs */}

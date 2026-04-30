@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { deleteProperty } from "@/lib/db/properties";
+import { deleteProperty, uploadPropertyMedia, deletePropertyMediaFile, updateProperty } from "@/lib/db/properties";
+import { compressVideo } from "@/lib/compress-video";
 import { formatPrice } from "@/lib/mock-data";
 import { Property, PropertyStatus } from "@/lib/types";
 
@@ -23,6 +24,9 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
+// ── Video compression progress ────────────────────────────────────────────────
+type CompressState = { pct: number; label: string } | null;
+
 export default function PropertyDetailPage({ params }: Props) {
   const router = useRouter();
   const [property, setProperty]           = useState<Property | null>(null);
@@ -30,6 +34,7 @@ export default function PropertyDetailPage({ params }: Props) {
   const [notFound, setNotFound]           = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting]           = useState(false);
+  const [compressState, setCompressState] = useState<CompressState>(null); // null = not running
 
   useEffect(() => {
     async function fetchProperty() {
@@ -49,6 +54,71 @@ export default function PropertyDetailPage({ params }: Props) {
     }
     fetchProperty();
   }, []);
+
+  // ── Background video compression ────────────────────────────────────────────
+  // Runs automatically when property.media_processing === true.
+  // Flow: fetch original → compress → re-upload → delete original → update DB → clear flag
+  useEffect(() => {
+    if (!property?.media_processing) return;
+
+    async function processVideos() {
+      if (!property) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const urls        = property.media_urls ?? [];
+      const updatedUrls = [...urls];
+      const videoIdxs   = urls.map((u, i) => isVideoUrl(u) ? i : -1).filter((i) => i >= 0);
+
+      for (let n = 0; n < videoIdxs.length; n++) {
+        const idx = videoIdxs[n];
+        const originalUrl = urls[idx];
+        const label = `Optimising video ${videoIdxs.length > 1 ? `${n + 1}/${videoIdxs.length}` : ""}…`;
+
+        try {
+          setCompressState({ pct: 0, label });
+
+          // 1. Fetch the original video from Supabase Storage
+          const resp = await fetch(originalUrl);
+          if (!resp.ok) throw new Error("Could not fetch original video");
+          const blob = await resp.blob();
+          const file = new File([blob], `video-${idx}.mp4`, { type: blob.type || "video/mp4" });
+
+          // 2. Compress with ffmpeg.wasm — shows progress bar
+          const compressed = await compressVideo(file, (pct) =>
+            setCompressState({ pct, label })
+          );
+
+          // 3. Upload the compressed version to Supabase Storage
+          const newUrl = await uploadPropertyMedia(compressed, user.id);
+
+          // 4. Replace the old URL in our array
+          updatedUrls[idx] = newUrl;
+
+          // 5. Delete the original large file from storage
+          await deletePropertyMediaFile(originalUrl);
+
+        } catch (err) {
+          // If one video fails, skip it and continue with others
+          console.error("Video compression failed for", originalUrl, err);
+        }
+      }
+
+      // 6. Save updated URLs + clear the processing flag
+      const finalUrls = updatedUrls;
+      await updateProperty(property.id, {
+        media_urls:       finalUrls,
+        image_url:        finalUrls[0] ?? property.image_url,
+        media_processing: false,
+      });
+
+      // 7. Update local state so UI refreshes without a page reload
+      setProperty((p) => p ? { ...p, media_urls: finalUrls, image_url: finalUrls[0] ?? p.image_url, media_processing: false } : p);
+      setCompressState(null);
+    }
+
+    processVideos();
+  }, [property?.id, property?.media_processing]);
 
   async function handleDelete() {
     if (!property) return;
@@ -91,6 +161,39 @@ export default function PropertyDetailPage({ params }: Props) {
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto pb-24 sm:pb-6">
+
+      {/* ── Video optimisation banner — shows while background compression runs ── */}
+      {(property.media_processing || compressState) && (
+        <div className="mb-4 rounded-2xl overflow-hidden" style={{ border: '1px solid #BFDBFE', background: '#EFF6FF' }}>
+          <div className="px-4 py-3 flex items-center gap-3">
+            <svg className="w-4 h-4 text-blue-500 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-blue-700">
+                {compressState?.label ?? "Loading video optimiser…"}
+              </p>
+              <p className="text-xs text-blue-500 mt-0.5">
+                {compressState?.pct
+                  ? `${compressState.pct}% — keep this page open`
+                  : "Preparing ffmpeg — first time takes ~10 seconds"}
+              </p>
+            </div>
+            {compressState?.pct != null && compressState.pct > 0 && (
+              <span className="text-sm font-bold text-blue-600 flex-shrink-0">{compressState.pct}%</span>
+            )}
+          </div>
+          {compressState?.pct != null && compressState.pct > 0 && (
+            <div className="h-1 bg-blue-100">
+              <div
+                className="h-full bg-blue-500 transition-all duration-300"
+                style={{ width: `${compressState.pct}%` }}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">

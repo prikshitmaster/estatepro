@@ -37,23 +37,28 @@ export default function NewPropertyPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
 
-      // Upload all selected media files and collect their URLs
+      // Upload all files — images are already compressed by ImageUpload component.
+      // Videos upload at original size; compression runs in background on the detail page.
       const mediaUrls = mediaFiles.length > 0
         ? await Promise.all(mediaFiles.map((f) => uploadPropertyMedia(f, user.id)))
         : [];
 
-      await addProperty({
-        user_id:    user.id,
-        title:      form.title,
-        type:       form.type,
-        location:   form.location,
-        price:      parseInt(form.price) || 0,
-        status:     form.status,
-        image_url:  mediaUrls[0],        // first photo/video = cover
-        media_urls: mediaUrls,           // all media
+      const hasVideo = mediaFiles.some((f) => f.type.startsWith("video/"));
+
+      const saved = await addProperty({
+        user_id:          user.id,
+        title:            form.title,
+        type:             form.type,
+        location:         form.location,
+        price:            parseInt(form.price) || 0,
+        status:           form.status,
+        image_url:        mediaUrls[0],
+        media_urls:       mediaUrls,
+        media_processing: hasVideo, // triggers background compression on detail page
       });
 
-      router.push("/properties");
+      // Go to detail page so background compression can start immediately
+      router.push(`/properties/${saved.id}`);
 
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to save property.");

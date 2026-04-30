@@ -94,11 +94,12 @@ export async function uploadPropertyImage(file: File, userId: string): Promise<s
 // ─────────────────────────────────────────────────────────────────────────────
 export async function uploadPropertyMedia(file: File, userId: string): Promise<string> {
   const isVideo = file.type.startsWith("video/");
-  const maxSize = isVideo ? 30 * 1024 * 1024 : 5 * 1024 * 1024;
-  const label   = isVideo ? "30MB" : "5MB";
 
-  if (file.size > maxSize) {
-    throw new Error(`${isVideo ? "Video" : "Image"} must be smaller than ${label}.`);
+  // Images: 5 MB limit (they are already compressed by Canvas before reaching here)
+  // Videos: no limit here — Supabase enforces its own bucket limit (default 50 MB).
+  //         Originals can be large; background compression will shrink them after save.
+  if (!isVideo && file.size > 5 * 1024 * 1024) {
+    throw new Error("Image must be smaller than 5 MB.");
   }
   if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
     throw new Error("Please select an image or video file.");
@@ -119,4 +120,17 @@ export async function uploadPropertyMedia(file: File, userId: string): Promise<s
     .getPublicUrl(filePath);
 
   return data.publicUrl;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE A SINGLE MEDIA FILE FROM STORAGE
+// Pass the full public URL — we extract the storage path from it automatically.
+// Used after background video compression to remove the original large file.
+// ─────────────────────────────────────────────────────────────────────────────
+export async function deletePropertyMediaFile(publicUrl: string): Promise<void> {
+  // Public URL format: https://xxx.supabase.co/storage/v1/object/public/property-images/PATH
+  const match = publicUrl.match(/\/storage\/v1\/object\/public\/property-images\/(.+)/);
+  if (!match) return; // not a Supabase Storage URL — skip
+  const storagePath = decodeURIComponent(match[1]);
+  await supabase.storage.from("property-images").remove([storagePath]);
 }

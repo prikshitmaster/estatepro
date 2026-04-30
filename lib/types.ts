@@ -35,8 +35,9 @@ export interface Property {
   location: string;
   price: number;
   status: PropertyStatus;
-  image_url?: string;      // cover photo (first item of media_urls)
-  media_urls?: string[];   // all photos + videos (up to 8)
+  image_url?: string;         // cover photo (first item of media_urls)
+  media_urls?: string[];      // all photos + videos (up to 8)
+  media_processing?: boolean; // true = original video uploaded, compression running in background
   created_at?: string;
 }
 

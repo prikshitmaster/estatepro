@@ -81,21 +81,23 @@ export default function EditPropertyPage({ params }: Props) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
 
-      // Upload any new files
+      // Upload any new files — videos go at original size, compressed in background
       const newUrls = mediaFiles.length > 0
         ? await Promise.all(mediaFiles.map((f) => uploadPropertyMedia(f, user.id)))
         : [];
 
       const allUrls = [...keptUrls, ...newUrls];
+      const hasNewVideo = mediaFiles.some((f) => f.type.startsWith("video/"));
 
       await updateProperty(property.id, {
-        title:      form.title,
-        type:       form.type,
-        location:   form.location,
-        price:      parseInt(form.price) || 0,
-        status:     form.status,
-        image_url:  allUrls[0] ?? property.image_url,
-        media_urls: allUrls,
+        title:            form.title,
+        type:             form.type,
+        location:         form.location,
+        price:            parseInt(form.price) || 0,
+        status:           form.status,
+        image_url:        allUrls[0] ?? property.image_url,
+        media_urls:       allUrls,
+        media_processing: hasNewVideo, // if new video added, trigger background compression
       });
       router.push(`/properties/${property.id}`);
     } catch (err) {
