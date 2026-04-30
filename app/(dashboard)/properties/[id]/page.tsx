@@ -134,9 +134,18 @@ export default function PropertyDetailPage({ params }: Props) {
       <div className="mt-5 flex flex-col gap-3">
         <Link
           href={`/properties/${property.id}/edit`}
-          className="w-full py-3 text-center bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
+          className="w-full py-3 text-center text-white text-sm font-semibold rounded-xl transition-colors"
+          style={{ background: '#1BC47D' }}
         >
           Edit Property
+        </Link>
+
+        <Link
+          href={`/secure-share/create?propertyId=${property.id}&title=${encodeURIComponent(property.title)}`}
+          className="w-full py-3 text-center text-sm font-semibold rounded-xl transition-colors"
+          style={{ background: '#6366F118', color: '#6366F1', border: '1px solid #6366F140' }}
+        >
+          🔗 Create Secure Share Link
         </Link>
 
         {!confirmDelete ? (

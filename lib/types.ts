@@ -137,3 +137,44 @@ export interface Task {
   completed: boolean;
   created_at?: string;
 }
+
+// ─── Secure Share types ───────────────────────────────────────────────────────
+
+export type ShareMediaType = "image" | "pdf" | "word" | "excel" | "video";
+
+export interface SecureShareLink {
+  id: string;
+  user_id: string;
+  token: string;
+  title: string;
+  property_id?: string | null;
+  property_title?: string | null;
+  expires_at?: string | null;
+  max_views?: number | null;
+  view_count: number;
+  is_active: boolean;
+  password_hash?: string | null;
+  created_at: string;
+}
+
+export interface ShareMedia {
+  id: string;
+  link_id: string;
+  user_id: string;
+  storage_path: string;
+  file_name: string;
+  media_type: ShareMediaType;
+  file_size?: number | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface ShareViewLog {
+  id: string;
+  link_id: string;
+  viewed_at: string;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  city?: string | null;
+  country?: string | null;
+}

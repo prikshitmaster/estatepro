@@ -9,15 +9,16 @@ import { getAllLeads } from "@/lib/db/leads";
 import { getFollowUpLogs } from "@/lib/db/follow-ups";
 
 const navItems = [
-  { label: "Dashboard",        href: "/dashboard",   icon: DashboardIcon  },
-  { label: "Leads",            href: "/leads",       icon: LeadsIcon      },
-  { label: "Follow-Ups",       href: "/follow-ups",  icon: FollowUpIcon   },
-  { label: "Properties",       href: "/properties",  icon: PropertiesIcon },
-  { label: "Clients",          href: "/clients",     icon: ClientsIcon    },
-  { label: "Tasks",            href: "/tasks",       icon: TasksIcon      },
-  { label: "Analytics",        href: "/analytics",   icon: AnalyticsIcon  },
-  { label: "AI Tools",         href: "/ai-tools",    icon: AIIcon         },
-  { label: "Newspaper Leads",  href: "/newspaper",   icon: NewspaperIcon  },
+  { label: "Dashboard",        href: "/dashboard",      icon: DashboardIcon,   accent: "#1BC47D" },
+  { label: "Leads",            href: "/leads",          icon: LeadsIcon,       accent: "#1BC47D" },
+  { label: "Follow-Ups",       href: "/follow-ups",     icon: FollowUpIcon,    accent: "#1BC47D" },
+  { label: "Properties",       href: "/properties",     icon: PropertiesIcon,  accent: "#1BC47D" },
+  { label: "Clients",          href: "/clients",        icon: ClientsIcon,     accent: "#1BC47D" },
+  { label: "Tasks",            href: "/tasks",          icon: TasksIcon,       accent: "#1BC47D" },
+  { label: "Analytics",        href: "/analytics",      icon: AnalyticsIcon,   accent: "#1BC47D" },
+  { label: "AI Tools",         href: "/ai-tools",       icon: AIIcon,          accent: "#1BC47D" },
+  { label: "Secure Share",     href: "/secure-share",   icon: SecureShareIcon, accent: "#6366F1" },
+  { label: "Newspaper Leads",  href: "/newspaper",      icon: NewspaperIcon,   accent: "#1BC47D" },
 ];
 
 function getInitials(name: string): string {
@@ -104,7 +105,7 @@ export default function Sidebar() {
           Menu
         </p>
 
-        {navItems.map(({ label, href, icon: Icon }) => {
+        {navItems.map(({ label, href, icon: Icon, accent }) => {
           const active = isActive(href);
           return (
             <Link
@@ -113,8 +114,8 @@ export default function Sidebar() {
               className="flex items-center gap-2.5 rounded-xl transition-colors"
               style={{
                 padding: '8px 10px',
-                background: active ? '#1BC47D18' : 'transparent',
-                color: active ? '#1BC47D' : '#6B7280',
+                background: active ? `${accent}18` : 'transparent',
+                color: active ? accent : '#6B7280',
                 fontWeight: active ? 600 : 400,
                 fontSize: 13.5,
                 marginBottom: 1,
@@ -221,6 +222,9 @@ function SettingsIcon({ active }: { active: boolean }) {
 }
 function NewspaperIcon({ active }: { active: boolean }) {
   return <svg className="w-4 h-4 shrink-0" style={{ color: active ? '#1BC47D' : '#9CA3AF' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.2 : 1.8} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>;
+}
+function SecureShareIcon({ active }: { active: boolean }) {
+  return <svg className="w-4 h-4 shrink-0" style={{ color: active ? '#6366F1' : '#9CA3AF' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.2 : 1.8} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>;
 }
 function LogoutIcon() {
   return <svg className="w-4 h-4 shrink-0" style={{ color: '#9CA3AF' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>;
