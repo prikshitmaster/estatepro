@@ -1,34 +1,26 @@
-// app/_components/ImageUpload.tsx — Multi-photo + video upload
-//
-// Features:
-//   - Select up to 8 photos from gallery (multiple at once)
-//   - Take a live photo with the phone camera
-//   - Pick videos from gallery
-//   - See all selected media in a grid, remove any item
-//   - Works in both Add Property and Edit Property forms
+// app/_components/ImageUpload.tsx — Multi-photo + video upload with compression
 "use client";
 
 import { useRef, useState } from "react";
+import { compressImage } from "@/lib/compress-image";
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const VIDEO_EXT = /\.(mp4|webm|mov|avi|mkv|ogv)(\?.*)?$/i;
 function isVideoUrl(url: string)  { return VIDEO_EXT.test(url); }
 function isVideoFile(file: File)  { return file.type.startsWith("video/"); }
 
 interface NewItem {
-  key: string;
+  key:        string;
   previewUrl: string;
-  isVideo: boolean;
-  file: File;
+  isVideo:    boolean;
+  file:       File;
 }
 
 interface Props {
-  // For edit form: URLs already saved in DB
-  existingUrls?: string[];
-  // Called whenever new files list changes
-  onFilesChange: (files: File[]) => void;
-  // Called when user removes an existing (already-saved) URL
+  existingUrls?:     string[];
+  onFilesChange:     (files: File[]) => void;
   onExistingRemove?: (url: string) => void;
-  maxTotal?: number;
+  maxTotal?:         number;
 }
 
 export default function ImageUpload({
@@ -41,24 +33,37 @@ export default function ImageUpload({
   const cameraRef  = useRef<HTMLInputElement>(null);
   const videoRef   = useRef<HTMLInputElement>(null);
 
-  const [newItems, setNewItems] = useState<NewItem[]>([]);
+  const [newItems,     setNewItems]     = useState<NewItem[]>([]);
+  const [compressing,  setCompressing]  = useState(false);
 
   const totalCount = existingUrls.length + newItems.length;
   const canAdd     = totalCount < maxTotal;
 
-  function handleFilePick(files: FileList | null) {
+  async function handleFilePick(files: FileList | null) {
     if (!files) return;
-    const slots     = maxTotal - totalCount;
-    const toAdd     = Array.from(files).slice(0, slots);
-    const added: NewItem[] = toAdd.map((file) => ({
-      key:        `new-${Date.now()}-${Math.random()}`,
-      previewUrl: URL.createObjectURL(file),
-      isVideo:    isVideoFile(file),
-      file,
-    }));
-    const updated = [...newItems, ...added];
-    setNewItems(updated);
-    onFilesChange(updated.map((i) => i.file));
+    const slots = maxTotal - totalCount;
+    const raw   = Array.from(files).slice(0, slots);
+    if (raw.length === 0) return;
+
+    setCompressing(true);
+    try {
+      // Compress images; pass videos through unchanged
+      const processed = await Promise.all(
+        raw.map((f) => isVideoFile(f) ? Promise.resolve(f) : compressImage(f))
+      );
+
+      const added: NewItem[] = processed.map((file) => ({
+        key:        `new-${Date.now()}-${Math.random()}`,
+        previewUrl: URL.createObjectURL(file),
+        isVideo:    isVideoFile(file),
+        file,
+      }));
+      const updated = [...newItems, ...added];
+      setNewItems(updated);
+      onFilesChange(updated.map((i) => i.file));
+    } finally {
+      setCompressing(false);
+    }
   }
 
   function removeNew(key: string) {
@@ -101,19 +106,30 @@ export default function ImageUpload({
         </div>
       )}
 
+      {/* Compression indicator */}
+      {compressing && (
+        <p className="text-xs text-blue-500 text-center py-1 mb-2">
+          Compressing photos...
+        </p>
+      )}
+
       {/* Action buttons */}
-      {canAdd ? (
+      {canAdd && !compressing ? (
         <div className="grid grid-cols-3 gap-2">
           <ActionBtn onClick={() => galleryRef.current?.click()} icon={<PhotoIcon />} label="Photos" />
           <ActionBtn onClick={() => cameraRef.current?.click()} icon={<CameraIcon />} label="Camera" />
           <ActionBtn onClick={() => videoRef.current?.click()}  icon={<VideoIcon />}  label="Video" />
         </div>
-      ) : (
+      ) : !compressing ? (
         <p className="text-center text-xs text-gray-400 py-2">Max {maxTotal} items reached</p>
-      )}
+      ) : null}
+
+      {/* Video size tip */}
+      <p className="text-[11px] text-gray-400 mt-1.5 text-center">
+        Images auto-compressed · Videos max 10MB · Tip: trim videos before uploading
+      </p>
 
       {/* Hidden file inputs */}
-      {/* Gallery — multiple photos */}
       <input
         ref={galleryRef}
         type="file"
@@ -122,7 +138,6 @@ export default function ImageUpload({
         onChange={(e) => { handleFilePick(e.target.files); e.target.value = ""; }}
         className="hidden"
       />
-      {/* Camera — single live photo */}
       <input
         ref={cameraRef}
         type="file"
@@ -131,7 +146,6 @@ export default function ImageUpload({
         onChange={(e) => { handleFilePick(e.target.files); e.target.value = ""; }}
         className="hidden"
       />
-      {/* Gallery — multiple videos */}
       <input
         ref={videoRef}
         type="file"

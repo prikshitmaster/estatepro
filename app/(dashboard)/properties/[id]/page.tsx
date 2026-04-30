@@ -1,11 +1,4 @@
 // app/(dashboard)/properties/[id]/page.tsx — View a single property's details
-//
-// 🧠 WHAT THIS PAGE DOES:
-//    When you click "View Details" on a property card, this page opens.
-//    It shows everything about that property — title, type, location, price, status.
-//    Two buttons:
-//      1. "Edit Property" → go to /properties/[id]/edit
-//      2. "Delete"        → confirm then permanently remove
 "use client";
 
 import { useEffect, useState } from "react";
@@ -23,17 +16,20 @@ const STATUS_STYLE: Record<PropertyStatus, string> = {
   "off-market": "bg-yellow-50 text-yellow-700",
 };
 
+const VIDEO_EXT = /\.(mp4|webm|mov|avi|mkv|ogv)(\?.*)?$/i;
+function isVideoUrl(url: string) { return VIDEO_EXT.test(url); }
+
 interface Props {
   params: Promise<{ id: string }>;
 }
 
 export default function PropertyDetailPage({ params }: Props) {
   const router = useRouter();
-  const [property, setProperty]         = useState<Property | null>(null);
-  const [loading, setLoading]           = useState(true);
-  const [notFound, setNotFound]         = useState(false);
+  const [property, setProperty]           = useState<Property | null>(null);
+  const [loading, setLoading]             = useState(true);
+  const [notFound, setNotFound]           = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting]         = useState(false);
+  const [deleting, setDeleting]           = useState(false);
 
   useEffect(() => {
     async function fetchProperty() {
@@ -86,6 +82,13 @@ export default function PropertyDetailPage({ params }: Props) {
     );
   }
 
+  // Build full media list: prefer media_urls array, fall back to single image_url
+  const allMedia: string[] = property.media_urls?.length
+    ? property.media_urls
+    : property.image_url
+      ? [property.image_url]
+      : [];
+
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto pb-24 sm:pb-6">
 
@@ -103,17 +106,8 @@ export default function PropertyDetailPage({ params }: Props) {
         </span>
       </div>
 
-      {/* Property photo — shown only if one was uploaded */}
-      {property.image_url && (
-        <div className="mb-5 rounded-2xl overflow-hidden border border-gray-100">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={property.image_url}
-            alt={property.title}
-            className="w-full h-56 object-cover"
-          />
-        </div>
-      )}
+      {/* Media carousel */}
+      {allMedia.length > 0 && <MediaCarousel urls={allMedia} />}
 
       {/* Details card */}
       <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-100">
@@ -180,6 +174,113 @@ export default function PropertyDetailPage({ params }: Props) {
     </div>
   );
 }
+
+// ── Media Carousel ────────────────────────────────────────────────────────────
+
+function MediaCarousel({ urls }: { urls: string[] }) {
+  const [index, setIndex]           = useState(0);
+  const [touchStartX, setTouchStartX] = useState(0);
+
+  const current = urls[index];
+  const total   = urls.length;
+
+  function prev() { setIndex(i => (i === 0 ? total - 1 : i - 1)); }
+  function next() { setIndex(i => (i === total - 1 ? 0 : i + 1)); }
+
+  function onTouchStart(e: React.TouchEvent) {
+    setTouchStartX(e.touches[0].clientX);
+  }
+  function onTouchEnd(e: React.TouchEvent) {
+    const diff = touchStartX - e.changedTouches[0].clientX;
+    if (diff > 50)  next();
+    if (diff < -50) prev();
+  }
+
+  return (
+    <div
+      className="mb-5 rounded-2xl overflow-hidden border border-gray-100 relative bg-black select-none"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* Media item */}
+      {isVideoUrl(current) ? (
+        <video
+          key={current}
+          src={current}
+          controls
+          playsInline
+          className="w-full h-60 object-contain bg-black"
+        />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={current}
+          src={current}
+          alt=""
+          className="w-full h-60 object-cover"
+        />
+      )}
+
+      {/* Counter badge top-right */}
+      {total > 1 && (
+        <div className="absolute top-2.5 right-2.5 bg-black/55 text-white text-xs font-medium px-2 py-0.5 rounded-full">
+          {index + 1} / {total}
+        </div>
+      )}
+
+      {/* Video badge top-left */}
+      {isVideoUrl(current) && (
+        <div className="absolute top-2.5 left-2.5 bg-black/55 text-white text-xs font-medium px-2 py-0.5 rounded-full flex items-center gap-1">
+          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+          Video
+        </div>
+      )}
+
+      {/* Left / Right arrows (shown when multiple items) */}
+      {total > 1 && (
+        <>
+          <button
+            onClick={prev}
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/45 hover:bg-black/65 text-white rounded-full flex items-center justify-center transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <button
+            onClick={next}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/45 hover:bg-black/65 text-white rounded-full flex items-center justify-center transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </>
+      )}
+
+      {/* Dot indicators */}
+      {total > 1 && (
+        <div className="absolute bottom-2.5 left-0 right-0 flex justify-center gap-1.5">
+          {urls.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setIndex(i)}
+              className={`rounded-full transition-all ${
+                i === index
+                  ? "w-4 h-1.5 bg-white"
+                  : "w-1.5 h-1.5 bg-white/50"
+              }`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Layout helpers ────────────────────────────────────────────────────────────
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

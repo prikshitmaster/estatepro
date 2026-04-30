@@ -12,6 +12,10 @@ import {
   getMediaType,
 } from "@/lib/db/secure-share";
 import { Property, ShareMediaType } from "@/lib/types";
+import { compressImage } from "@/lib/compress-image";
+
+// ── Helper: detect if a URL points to a video ────────────────────────────────
+const IS_VIDEO_URL = /\.(mp4|webm|mov|avi|mkv|ogv)(\?.*)?$/i;
 
 const ACCENT = "#6366F1";
 
@@ -51,9 +55,9 @@ export default function CreateShareLinkPage() {
   const [watermark,     setWatermark]     = useState(true);
   const [watermarkText, setWatermarkText] = useState("PROTECTED · ESTATEPRO");
 
-  // Property image inclusion
-  const [includePropertyImage, setIncludePropertyImage] = useState(false);
-  const [propertyImageUrl,     setPropertyImageUrl]     = useState<string | null>(null);
+  // Property media inclusion — all photos + videos the broker already uploaded
+  const [includePropertyMedia, setIncludePropertyMedia] = useState(false);
+  const [propertyMediaUrls,    setPropertyMediaUrls]    = useState<string[]>([]);
 
   // ── Data ───────────────────────────────────────────────────────────────────
   const [properties, setProperties] = useState<Property[]>([]);
@@ -72,21 +76,20 @@ export default function CreateShareLinkPage() {
     getAllProperties().then(setProperties).catch(() => {});
   }, []);
 
-  // ── When propertyId changes, detect if it has an existing photo ──────────
+  // ── When propertyId changes, load ALL property media (photos + videos) ────
   useEffect(() => {
     if (!propertyId || !properties.length) {
-      setPropertyImageUrl(null);
-      setIncludePropertyImage(false);
+      setPropertyMediaUrls([]);
+      setIncludePropertyMedia(false);
       return;
     }
     const prop = properties.find((p) => p.id === propertyId);
-    if (prop?.image_url) {
-      setPropertyImageUrl(prop.image_url);
-      setIncludePropertyImage(true); // auto-check
-    } else {
-      setPropertyImageUrl(null);
-      setIncludePropertyImage(false);
-    }
+    // Use media_urls array first; fall back to single image_url for old properties
+    const urls = prop?.media_urls?.length
+      ? prop.media_urls
+      : prop?.image_url ? [prop.image_url] : [];
+    setPropertyMediaUrls(urls);
+    setIncludePropertyMedia(urls.length > 0); // auto-check if media exists
   }, [propertyId, properties]);
 
   // ── File handling ─────────────────────────────────────────────────────────
@@ -112,8 +115,8 @@ export default function CreateShareLinkPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) { setError("Please enter a title."); return; }
-    if (!files.length && !includePropertyImage) {
-      setError("Please add at least one file, or include the property photo.");
+    if (!files.length && !includePropertyMedia) {
+      setError("Please add at least one file, or include the property photos.");
       return;
     }
 
@@ -142,24 +145,30 @@ export default function CreateShareLinkPage() {
         file_size: number; sort_order: number;
       }> = [];
 
-      // Property photo goes first
-      if (includePropertyImage && propertyImageUrl) {
-        mediaToInsert.push({
-          link_id:      link.id,
-          user_id:      user.id,
-          storage_path: "",
-          external_url: propertyImageUrl,
-          file_name:    `${selectedProp?.title ?? "Property"} — Photo`,
-          media_type:   "image",
-          file_size:    0,
-          sort_order:   0,
+      // All property media goes first (photos + videos already in Supabase Storage)
+      if (includePropertyMedia) {
+        propertyMediaUrls.forEach((url, idx) => {
+          const isVid = IS_VIDEO_URL.test(url);
+          mediaToInsert.push({
+            link_id:      link.id,
+            user_id:      user.id,
+            storage_path: "",
+            external_url: url,
+            file_name:    `${selectedProp?.title ?? "Property"} — ${isVid ? "Video" : "Photo"} ${idx + 1}`,
+            media_type:   (isVid ? "video" : "image") as ShareMediaType,
+            file_size:    0,
+            sort_order:   idx,
+          });
         });
       }
 
-      // Upload user files in parallel
+      // Compress images before uploading, then upload in parallel
       if (files.length) {
+        const processed = await Promise.all(
+          files.map((f) => f.type.startsWith("image/") ? compressImage(f) : Promise.resolve(f))
+        );
         const uploads = await Promise.all(
-          files.map((f) => uploadShareFile(user.id, link.id, f))
+          processed.map((f) => uploadShareFile(user.id, link.id, f))
         );
         uploads.forEach((u, i) => {
           mediaToInsert.push({
@@ -168,7 +177,7 @@ export default function CreateShareLinkPage() {
             storage_path: u.storage_path,
             file_name:    files[i].name,
             media_type:   getMediaType(files[i]),
-            file_size:    files[i].size,
+            file_size:    processed[i].size, // compressed size
             sort_order:   mediaToInsert.length,
           });
         });
@@ -253,7 +262,7 @@ export default function CreateShareLinkPage() {
   }
 
   // ── Create form ───────────────────────────────────────────────────────────
-  const totalItems = files.length + (includePropertyImage && propertyImageUrl ? 1 : 0);
+  const totalItems = files.length + (includePropertyMedia ? propertyMediaUrls.length : 0);
 
   return (
     <div className="p-4 sm:p-6 max-w-xl mx-auto pb-24 sm:pb-6">
@@ -298,24 +307,44 @@ export default function CreateShareLinkPage() {
               </select>
             </div>
 
-            {/* Auto-detected property photo */}
-            {propertyImageUrl && (
+            {/* Auto-detected property media — all photos + videos */}
+            {propertyMediaUrls.length > 0 && (
               <div
                 className="flex items-center gap-3 p-3 rounded-xl cursor-pointer"
-                style={{ background: includePropertyImage ? `${ACCENT}08` : '#F8F9FB', border: `1px solid ${includePropertyImage ? ACCENT + '40' : '#EEF1F6'}` }}
-                onClick={() => setIncludePropertyImage((v) => !v)}
+                style={{ background: includePropertyMedia ? `${ACCENT}08` : '#F8F9FB', border: `1px solid ${includePropertyMedia ? ACCENT + '40' : '#EEF1F6'}` }}
+                onClick={() => setIncludePropertyMedia((v) => !v)}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={propertyImageUrl} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                {/* Thumbnail strip — up to 4 previews */}
+                <div className="flex gap-1 shrink-0">
+                  {propertyMediaUrls.slice(0, 4).map((url, i) =>
+                    IS_VIDEO_URL.test(url) ? (
+                      <div key={i} className="w-10 h-10 rounded-lg bg-gray-800 flex items-center justify-center shrink-0">
+                        <svg width={14} height={14} fill="white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                      </div>
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={i} src={url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                    )
+                  )}
+                  {propertyMediaUrls.length > 4 && (
+                    <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0 text-[10px] font-bold text-gray-400">
+                      +{propertyMediaUrls.length - 4}
+                    </div>
+                  )}
+                </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold" style={{ color: '#374151' }}>Include property photo</p>
-                  <p className="text-[11px]" style={{ color: '#9CA3AF' }}>Already uploaded — no re-upload needed</p>
+                  <p className="text-xs font-semibold" style={{ color: '#374151' }}>
+                    Include property media
+                  </p>
+                  <p className="text-[11px]" style={{ color: '#9CA3AF' }}>
+                    {propertyMediaUrls.length} item{propertyMediaUrls.length !== 1 ? "s" : ""} — no re-upload needed
+                  </p>
                 </div>
                 <div
                   className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
-                  style={{ background: includePropertyImage ? ACCENT : '#E5E7EB' }}
+                  style={{ background: includePropertyMedia ? ACCENT : '#E5E7EB' }}
                 >
-                  {includePropertyImage && (
+                  {includePropertyMedia && (
                     <svg width={11} height={11} fill="none" stroke="white" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
@@ -496,7 +525,7 @@ export default function CreateShareLinkPage() {
           {creating ? (
             <span className="flex items-center justify-center gap-2">
               <SpinnerIcon />
-              {files.length ? `Uploading ${files.length} file${files.length !== 1 ? "s" : ""}…` : "Creating link…"}
+              {files.length ? `Compressing & uploading ${files.length} file${files.length !== 1 ? "s" : ""}…` : "Creating link…"}
             </span>
           ) : (
             `Create Share Link${totalItems ? ` · ${totalItems} item${totalItems !== 1 ? "s" : ""}` : ""}`
