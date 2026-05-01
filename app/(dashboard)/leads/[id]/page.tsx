@@ -4,9 +4,11 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getLeadById, updateLead, deleteLead } from "@/lib/db/leads";
+import { getAllProperties } from "@/lib/db/properties";
 import { getFollowUpLogs } from "@/lib/db/follow-ups";
 import { formatPrice } from "@/lib/mock-data";
-import { Lead, LeadStage, LeadSource, FollowUpLog } from "@/lib/types";
+import { Lead, LeadStage, LeadSource, FollowUpLog, Property } from "@/lib/types";
+import { matchPropertiesToLead, budgetDiff, MatchResult } from "@/lib/match-utils";
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -143,14 +145,15 @@ function InlineText({ value, placeholder, onSave, type = "text" }: {
 export default function LeadDetailPage({ params }: Props) {
   const router = useRouter();
 
-  const [lead,       setLead]       = useState<Lead | null>(null);
-  const [logs,       setLogs]       = useState<FollowUpLog[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [notFound,   setNotFound]   = useState(false);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const [confirmDel, setConfirmDel] = useState(false);
-  const [deleting,   setDeleting]   = useState(false);
-  const [notes,      setNotes]      = useState("");
+  const [lead,             setLead]             = useState<Lead | null>(null);
+  const [logs,             setLogs]             = useState<FollowUpLog[]>([]);
+  const [loading,          setLoading]          = useState(true);
+  const [notFound,         setNotFound]         = useState(false);
+  const [saveStatus,       setSaveStatus]       = useState<"idle" | "saving" | "saved">("idle");
+  const [confirmDel,       setConfirmDel]       = useState(false);
+  const [deleting,         setDeleting]         = useState(false);
+  const [notes,            setNotes]            = useState("");
+  const [matchedProperties, setMatchedProperties] = useState<MatchResult<Property>>({ perfect: [], close: [] });
 
   const saveTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -163,12 +166,15 @@ export default function LeadDetailPage({ params }: Props) {
       setLead(data);
       setNotes(data.notes ?? "");
       setLoading(false);
-      // Load follow-up history silently
-      getFollowUpLogs("").then(() => {}).catch(() => {});
-      // Load logs for this lead
+      // Load follow-up logs for this lead
       import("@/lib/db/follow-ups").then(({ getFollowUpLogs: fn }) =>
         fn(data.user_id).then((l) => setLogs(l.filter((x) => x.lead_id === id)))
       ).catch(() => {});
+
+      // Load all properties and compute matches based on lead's requirements
+      getAllProperties().then((props) => {
+        setMatchedProperties(matchPropertiesToLead(data, props));
+      }).catch(() => {});
     }
     load();
   }, []); // eslint-disable-line
@@ -438,6 +444,56 @@ export default function LeadDetailPage({ params }: Props) {
         </Link>
       )}
 
+      {/* ── Matched Properties (two tiers) ── */}
+      {(matchedProperties.perfect.length > 0 || matchedProperties.close.length > 0) && (
+        <div className="flex flex-col gap-2">
+
+          {/* ── Tier 1: Perfect Match ── */}
+          {matchedProperties.perfect.length > 0 && (
+            <div className="rounded-2xl overflow-hidden border border-emerald-100" style={{ background: "#F0FDF9" }}>
+              <div className="px-4 pt-4 pb-3 flex items-center gap-2">
+                <span className="text-base">✅</span>
+                <div>
+                  <p className="text-sm font-bold text-emerald-800">
+                    Perfect Match ({matchedProperties.perfect.length})
+                  </p>
+                  <p className="text-[11px] text-emerald-600">Price is within {lead.name}&apos;s budget</p>
+                </div>
+              </div>
+              <div className="px-3 pb-3 flex flex-col gap-2">
+                {matchedProperties.perfect.map((prop) => (
+                  <PropertyMatchCard key={prop.id} prop={prop} lead={lead} tier="perfect" />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Tier 2: Close Match ── */}
+          {matchedProperties.close.length > 0 && (
+            <div className="rounded-2xl overflow-hidden border border-amber-100" style={{ background: "#FFFBEB" }}>
+              <div className="px-4 pt-4 pb-3 flex items-center gap-2">
+                <span className="text-base">🟡</span>
+                <div>
+                  <p className="text-sm font-bold text-amber-800">
+                    Close Match ({matchedProperties.close.length})
+                  </p>
+                  <p className="text-[11px] text-amber-600">Slightly above or below budget — worth showing</p>
+                </div>
+              </div>
+              <div className="px-3 pb-3 flex flex-col gap-2">
+                {matchedProperties.close.map((prop) => (
+                  <PropertyMatchCard
+                    key={prop.id} prop={prop} lead={lead} tier="close"
+                    diff={budgetDiff(prop.price, lead.budget_min ?? 0, lead.budget_max ?? 0)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
       {/* ── Quick Share Property Link ── */}
       <Link
         href={`/secure-share/create?title=${encodeURIComponent(lead.name + " — Property Share")}`}
@@ -486,6 +542,77 @@ export default function LeadDetailPage({ params }: Props) {
         )}
       </div>
 
+    </div>
+  );
+}
+
+// ── PropertyMatchCard ─────────────────────────────────────────────────────────
+
+const WA_ICON = (
+  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-white shrink-0">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+  </svg>
+);
+
+function PropertyMatchCard({
+  prop, lead, tier, diff = 0,
+}: {
+  prop: Property; lead: Lead; tier: "perfect" | "close"; diff?: number;
+}) {
+  const thumb = prop.image_url ?? prop.media_urls?.[0] ?? null;
+  const waMsg = encodeURIComponent(
+    `Hi ${lead.name}! 👋\n\nI found a property that matches your requirement:\n\n🏢 *${prop.title}*\n📍 ${prop.location}\n💰 *${formatPrice(prop.price)}*\n\nWould you like to schedule a visit?\n\n_Sent via EstatePro CRM_`
+  );
+
+  const diffLabel = diff > 0
+    ? `+${formatPrice(diff)} above budget`
+    : diff < 0
+      ? `${formatPrice(Math.abs(diff))} below budget`
+      : "";
+
+  const borderColor = tier === "perfect" ? "#A7F3D0" : "#FDE68A";
+  const badgeBg     = tier === "perfect" ? "#D1FAE5"  : "#FEF3C7";
+  const badgeText   = tier === "perfect" ? "#065F46"  : "#92400E";
+
+  return (
+    <div className="bg-white rounded-xl overflow-hidden" style={{ border: `1px solid ${borderColor}` }}>
+      <div className="flex gap-3 p-3">
+        <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 flex items-center justify-center text-2xl"
+          style={{ background: tier === "perfect" ? "#ECFDF5" : "#FFFBEB" }}>
+          {thumb
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={thumb} alt="" className="w-full h-full object-cover" />
+            : "🏢"}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-gray-900 truncate leading-tight">{prop.title}</p>
+          <p className="text-xs text-gray-400 mt-0.5">📍 {prop.location}</p>
+          <p className="text-sm font-bold mt-1" style={{ color: "#1BC47D" }}>{formatPrice(prop.price)}</p>
+          <div className="flex gap-1 mt-1.5 flex-wrap">
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md" style={{ background: badgeBg, color: badgeText }}>
+              {tier === "perfect" ? "✓ Budget" : `~ ${diffLabel}`}
+            </span>
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md" style={{ background: badgeBg, color: badgeText }}>✓ Location</span>
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md" style={{ background: badgeBg, color: badgeText }}>✓ Type</span>
+          </div>
+        </div>
+      </div>
+      <div className="flex border-t border-gray-100">
+        <Link
+          href={`/properties/${prop.id}`}
+          className="flex-1 py-2.5 text-center text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors border-r border-gray-100"
+        >
+          View Details
+        </Link>
+        <a
+          href={`https://wa.me/91${lead.phone.replace(/\D/g, "")}?text=${waMsg}`}
+          target="_blank" rel="noopener noreferrer"
+          className="flex-1 py-2.5 text-center text-xs font-semibold text-white flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
+          style={{ background: "#25D366" }}
+        >
+          {WA_ICON} Send on WhatsApp
+        </a>
+      </div>
     </div>
   );
 }
