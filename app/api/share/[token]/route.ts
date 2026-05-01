@@ -79,12 +79,24 @@ export async function GET(
     .update({ view_count: link.view_count + 1 })
     .eq("id", link.id);
 
-  // ── 6. Return payload to viewer ───────────────────────────────────────────
+  // ── 6. Fetch property details (if link has a property_id) ────────────────
+  let property_details = null;
+  if (link.property_id) {
+    const { data: prop } = await supabaseAdmin
+      .from("properties")
+      .select("price, location, type, bedrooms, area_sqft, furnishing, bathrooms, parking, floor_no, total_floors, facing, possession, amenities, description")
+      .eq("id", link.property_id)
+      .single();
+    property_details = prop ?? null;
+  }
+
+  // ── 7. Return payload to viewer ───────────────────────────────────────────
   return NextResponse.json({
     title:             link.title,
     property_title:    link.property_title ?? null,
     watermark_enabled: link.watermark_enabled ?? true,
     watermark_text:    link.watermark_text ?? "PROTECTED · ESTATEPRO",
     media:             signedMedia,
+    property_details,
   });
 }
