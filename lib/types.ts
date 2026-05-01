@@ -195,3 +195,38 @@ export interface ShareViewLog {
   city?: string | null;
   country?: string | null;
 }
+
+// ── Commission Deal types ─────────────────────────────────────────────────────
+
+export interface Deal {
+  id: string;
+  user_id: string;
+  lead_id?: string | null;
+  property_id?: string | null;
+  lead_name: string;
+  property_title?: string;
+  sale_price: number;
+  commission_pct: number;
+  commission_amt: number;
+  deal_date: string;
+  notes?: string;
+  created_at: string;
+}
+
+// ── Site Visit types ──────────────────────────────────────────────────────────
+
+export type SiteVisitStatus = "scheduled" | "completed" | "cancelled";
+
+export interface SiteVisit {
+  id: string;
+  user_id: string;
+  lead_id?: string | null;
+  property_id?: string | null;
+  lead_name: string;
+  lead_phone?: string;
+  property_title?: string;
+  scheduled_at: string;
+  status: SiteVisitStatus;
+  notes?: string;
+  created_at: string;
+}

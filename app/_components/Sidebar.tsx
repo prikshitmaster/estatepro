@@ -19,6 +19,8 @@ const mainItems = [
 
 const toolItems = [
   { label: "Properties",        href: "/properties",   icon: PropertiesIcon,  accent: "#1BC47D" },
+  { label: "Site Visits",       href: "/visits",       icon: VisitsIcon,      accent: "#1BC47D" },
+  { label: "Commission",        href: "/deals",        icon: DealsIcon,       accent: "#1BC47D" },
   { label: "Clients",           href: "/clients",      icon: ClientsIcon,     accent: "#1BC47D" },
   { label: "Reports",           href: "/analytics",    icon: AnalyticsIcon,   accent: "#1BC47D" },
   { label: "Message Templates", href: "/ai-tools",     icon: AIIcon,          accent: "#1BC47D" },
@@ -281,6 +283,12 @@ function NewspaperIcon({ active }: { active: boolean }) {
 }
 function SecureShareIcon({ active }: { active: boolean }) {
   return <svg className="w-4 h-4 shrink-0" style={{ color: active ? "#6366F1" : "#9CA3AF" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.2 : 1.8} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>;
+}
+function VisitsIcon({ active }: { active: boolean }) {
+  return <svg className="w-4 h-4 shrink-0" style={{ color: active ? "#1BC47D" : "#9CA3AF" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.2 : 1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>;
+}
+function DealsIcon({ active }: { active: boolean }) {
+  return <svg className="w-4 h-4 shrink-0" style={{ color: active ? "#1BC47D" : "#9CA3AF" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.2 : 1.8} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 }
 function LogoutIcon() {
   return <svg className="w-4 h-4 shrink-0" style={{ color: "#9CA3AF" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>;

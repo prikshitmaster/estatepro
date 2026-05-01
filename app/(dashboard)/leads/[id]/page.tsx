@@ -494,6 +494,33 @@ export default function LeadDetailPage({ params }: Props) {
         </div>
       )}
 
+      {/* ── Quick Actions ── */}
+      <div className="grid grid-cols-2 gap-3">
+        <Link
+          href={`/visits?leadName=${encodeURIComponent(lead.name)}&phone=${encodeURIComponent(lead.phone)}`}
+          className="flex items-center gap-2.5 px-4 py-3 rounded-2xl border transition-colors hover:opacity-90"
+          style={{ background: "#EFF6FF", borderColor: "#BFDBFE" }}
+        >
+          <span className="text-xl">📅</span>
+          <div>
+            <p className="text-sm font-bold text-blue-700">Schedule Visit</p>
+            <p className="text-[11px] text-blue-500">Book a site visit</p>
+          </div>
+        </Link>
+
+        <Link
+          href={`/deals?leadName=${encodeURIComponent(lead.name)}`}
+          className="flex items-center gap-2.5 px-4 py-3 rounded-2xl border transition-colors hover:opacity-90"
+          style={{ background: "#F0FDF4", borderColor: "#BBF7D0" }}
+        >
+          <span className="text-xl">💰</span>
+          <div>
+            <p className="text-sm font-bold text-emerald-700">Add Deal</p>
+            <p className="text-[11px] text-emerald-500">Record commission</p>
+          </div>
+        </Link>
+      </div>
+
       {/* ── Quick Share Property Link ── */}
       <Link
         href={`/secure-share/create?title=${encodeURIComponent(lead.name + " — Property Share")}`}
