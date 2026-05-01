@@ -176,6 +176,24 @@ export default function Sidebar() {
 
         {toolsOpen && toolItems.map((item) => <NavLink key={item.href} {...item} />)}
 
+        {/* ── Upgrade banner ── */}
+        <Link
+          href="/upgrade"
+          className="flex items-center gap-2 rounded-xl mt-4"
+          style={{
+            padding: "10px 12px",
+            background: "linear-gradient(135deg, #1BC47D18 0%, #6366F118 100%)",
+            border: "1px solid #1BC47D30",
+            textDecoration: "none",
+          }}
+        >
+          <span style={{ fontSize: 15 }}>⚡</span>
+          <div className="min-w-0 flex-1">
+            <p style={{ fontSize: 12, fontWeight: 700, color: "#0F172A", marginBottom: 0 }}>Upgrade Plan</p>
+            <p style={{ fontSize: 10, color: "#6B7280" }}>Starter ₹99 · Pro ₹299</p>
+          </div>
+        </Link>
+
         {/* ── Settings & Help ── */}
         <p className="px-2 pb-1" style={{ fontSize: 10, fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 14, marginBottom: 0 }}>
           Settings & Help
