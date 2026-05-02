@@ -1,7 +1,7 @@
 // app/api/razorpay/create-order/route.ts
 // Creates a Razorpay order and returns the order_id to the frontend
 import { NextResponse } from "next/server";
-import { razorpay, PLANS, PlanKey } from "@/lib/razorpay";
+import { getRazorpay, PLANS, PlanKey } from "@/lib/razorpay";
 
 export async function POST(req: Request) {
   try {
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
 
     const { amount, label } = PLANS[plan as PlanKey];
 
-    const order = await razorpay.orders.create({
+    const order = await getRazorpay().orders.create({
       amount,
       currency: "INR",
       receipt:  `ep_${user_id.slice(0, 8)}_${Date.now()}`,
