@@ -22,6 +22,7 @@ export default function AutoCapturePage() {
   const [activeTab,   setActiveTab]   = useState<Tab>("gmail");
   const [copied,      setCopied]      = useState(false);
   const [testResult,  setTestResult]  = useState<string | null>(null);
+  const [testParsed,  setTestParsed]  = useState<Record<string, string | number | null> | null>(null);
   const [testing,     setTesting]     = useState(false);
 
   // Get or create the user's inbox token
@@ -76,13 +77,13 @@ export default function AutoCapturePage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  // Send a test lead to verify everything works
   async function runTest() {
     if (!webhookUrl) return;
     setTesting(true);
     setTestResult(null);
+    setTestParsed(null);
     try {
-      const res = await fetch(webhookUrl, {
+      const res  = await fetch(webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -93,13 +94,14 @@ export default function AutoCapturePage() {
         }),
       });
       const json = await res.json();
-      if (json.success)      setTestResult("✅ Success! Check your Leads page — a test lead was created.");
-      else if (json.skipped) setTestResult(`⚠️ Skipped: ${json.reason} — working correctly! (duplicate phone)`);
-      else if (json.error === "Invalid token") setTestResult("❌ Invalid token — your webhook URL may be wrong. Try refreshing the page.");
-      else if (json.error === "Inbox disabled") setTestResult("❌ Inbox is disabled. Contact support.");
-      else                   setTestResult(`❌ Error: ${json.error || "Unknown error (status " + res.status + ")"}`);
+      if (json.parsed) setTestParsed(json.parsed);
+      if (json.success)                      setTestResult("✅ Lead created! Check your Leads page.");
+      else if (json.skipped)                 setTestResult(`⚠️ Skipped: ${json.reason} — system is working correctly.`);
+      else if (json.error === "Invalid token")  setTestResult("❌ Invalid token — refresh the page and try again.");
+      else if (json.error === "Inbox disabled") setTestResult("❌ Inbox disabled.");
+      else                                   setTestResult(`❌ Error: ${json.error || "Unknown (status " + res.status + ")"}`);
     } catch {
-      setTestResult("❌ Could not reach the API. Make sure the app is deployed on Vercel and you are using the Vercel URL.");
+      setTestResult("❌ Could not reach API — make sure you are on the Vercel URL, not localhost.");
     }
     setTesting(false);
   }
@@ -111,20 +113,18 @@ export default function AutoCapturePage() {
 var WEBHOOK_URL = "${webhookUrl}";
 
 function checkNewLeads() {
-  // Search for portal lead emails (unread, last 15 min)
-  // Covers all MagicBricks / 99acres sender addresses
+  // All Indian real estate portals — major + small
   var query = [
-    'from:magicbricks.com',
-    'from:99acres.com',
-    'from:housing.com',
-    'from:nobroker.in',
-    'from:proptiger.com',
-    'subject:"new lead"',
-    'subject:"new enquiry"',
-    'subject:"enquiry"',
-    'subject:"new query"',
-    'subject:"buyer enquiry"',
-    'subject:"property enquiry"'
+    'from:magicbricks.com', 'from:99acres.com', 'from:housing.com',
+    'from:nobroker.in',     'from:proptiger.com', 'from:squareyards.com',
+    'from:commonfloor.com', 'from:makaan.com',  'from:justdial.com',
+    'from:sulekha.com',     'from:olx.in',      'from:quikr.com',
+    'from:nestaway.com',    'from:anarock.com',  'from:zameen.com',
+    'from:bayut.com',       'from:indiabulls.com',
+    'subject:"new lead"',   'subject:"new enquiry"', 'subject:"enquiry"',
+    'subject:"buyer enquiry"', 'subject:"property enquiry"',
+    'subject:"new query"',  'subject:"lead alert"', 'subject:"lead notification"',
+    'subject:"new interest"', 'subject:"property interest"'
   ].join(' OR ') + ' is:unread newer_than:15m';
 
   var threads = GmailApp.search(query);
@@ -386,6 +386,42 @@ CREATE INDEX IF NOT EXISTS user_inboxes_unique_id_idx ON user_inboxes(unique_id)
               : "bg-red-50 border-red-100 text-red-800"
             }`}>
               {testResult}
+            </div>
+          )}
+
+          {/* Debug parsed output */}
+          {testParsed && (
+            <div className="bg-white border border-gray-100 rounded-2xl p-4">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Parser Debug — what was extracted</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                {[
+                  { key: "name",              label: "Name"      },
+                  { key: "phone",             label: "Phone"     },
+                  { key: "email",             label: "Email"     },
+                  { key: "location",          label: "City"      },
+                  { key: "budget_min",        label: "Budget Min"},
+                  { key: "budget_max",        label: "Budget Max"},
+                  { key: "property_interest", label: "BHK/Type"  },
+                  { key: "source",            label: "Portal"    },
+                  { key: "message",           label: "Message"   },
+                ].map(({ key, label }) => {
+                  const val = testParsed[key];
+                  const hasVal = val !== null && val !== undefined && val !== 0 && val !== "";
+                  return (
+                    <div key={key} className="flex items-start gap-2 min-w-0">
+                      <span className={`text-sm shrink-0 mt-0.5 ${hasVal ? "text-emerald-500" : "text-red-400"}`}>
+                        {hasVal ? "✓" : "✗"}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-gray-400 uppercase font-medium">{label}</p>
+                        <p className={`text-xs font-semibold truncate ${hasVal ? "text-gray-800" : "text-gray-300"}`}>
+                          {hasVal ? String(val) : "not found"}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

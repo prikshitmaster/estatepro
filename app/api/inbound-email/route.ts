@@ -1,49 +1,82 @@
 // app/api/inbound-email/route.ts
-//
-// This is the webhook endpoint that receives lead emails and auto-creates leads.
-//
-// Called by: Google Apps Script running in the agent's Gmail (every 5 min)
-// URL format: POST /api/inbound-email?id=UNIQUE_TOKEN
-//
-// Payload (JSON):
-//   { from, subject, text, html }
-//
-// Also handles SendGrid Inbound Parse (multipart) for future upgrade.
+// Webhook: POST /api/inbound-email?id=TOKEN
+// Called by Google Apps Script every 5 min with portal lead emails.
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin }             from "@/lib/supabase-admin";
 import { parseInboundEmail }         from "@/lib/email-parser";
 import type { LeadSource, PropertyInterest } from "@/lib/types";
 
-// Map parsed source name → valid LeadSource enum value
 function toLeadSource(source: string): LeadSource {
-  if (["99acres", "magicbricks", "housing", "nobroker", "proptiger", "squareyards"].includes(source)) return "ad";
-  if (source === "facebook") return "social";
+  const portalSources = ["99acres","magicbricks","housing","nobroker","proptiger",
+                         "squareyards","commonfloor","makaan","justdial","sulekha",
+                         "olx","quikr","nestaway","anarock","zameen","bayut"];
+  if (portalSources.includes(source)) return "ad";
+  if (source === "facebook" || source === "instagram") return "social";
   if (source === "website")  return "website";
   return "other";
 }
 
-// Map parsed property interest → valid PropertyInterest enum value
 function toPropertyInterest(raw: string): PropertyInterest | undefined {
-  const map: Record<string, PropertyInterest> = {
-    "1bhk": "1BHK", "1BHK": "1BHK",
-    "2bhk": "2BHK", "2BHK": "2BHK",
-    "3bhk": "3BHK", "3BHK": "3BHK",
-    "4bhk": "4BHK", "4BHK": "4BHK",
-    "villa": "Villa",
-    "plot": "Plot",
-    "commercial": "Commercial",
-  };
   const key = raw.toLowerCase().replace(/\s+/g, "");
-  for (const [k, v] of Object.entries(map)) {
-    if (key.includes(k.toLowerCase())) return v;
-  }
+  if (key.includes("1bhk") || key === "1") return "1BHK";
+  if (key.includes("2bhk") || key === "2") return "2BHK";
+  if (key.includes("3bhk") || key === "3") return "3BHK";
+  if (key.includes("4bhk") || key === "4") return "4BHK";
+  if (key.includes("villa"))               return "Villa";
+  if (key.includes("plot"))                return "Plot";
+  if (key.includes("commercial") || key.includes("office")) return "Commercial";
   return undefined;
+}
+
+// Check if lead may have enquired on a sold/rented property and find alternatives
+async function checkSoldProperty(userId: string, parsed: ReturnType<typeof parseInboundEmail>) {
+  try {
+    const { data: inactive } = await supabaseAdmin
+      .from("properties")
+      .select("id, title, location, type, price, status, bedrooms")
+      .eq("user_id", userId)
+      .in("status", ["sold", "rented", "off-market"]);
+
+    if (!inactive?.length) return null;
+
+    const loc = (parsed.location ?? "").toLowerCase();
+    const bhk = (parsed.property_interest ?? "").toLowerCase();
+    const budget = parsed.budget_max ?? 0;
+
+    const matched = inactive.find(p => {
+      const pLoc = (p.location ?? "").toLowerCase();
+      const pBhk = (p.bedrooms ?? p.type ?? "").toLowerCase();
+      const pPrice = p.price ?? 0;
+
+      const locMatch = loc && pLoc && (pLoc.includes(loc) || loc.includes(pLoc));
+      const bhkMatch = bhk && pBhk && (pBhk.includes(bhk.replace("bhk", "")) || bhk.includes(pBhk));
+      const budgetMatch = budget > 0 && pPrice > 0 &&
+        Math.abs(pPrice - budget) / Math.max(pPrice, budget) < 0.35;
+
+      // Need at least 2 signals to avoid false positives
+      return [locMatch, bhkMatch, budgetMatch].filter(Boolean).length >= 2;
+    });
+
+    if (!matched) return null;
+
+    // Find active alternatives
+    const { data: alternatives } = await supabaseAdmin
+      .from("properties")
+      .select("title, location, price")
+      .eq("user_id", userId)
+      .eq("status", "available")
+      .limit(3);
+
+    return { matched, alternatives: alternatives ?? [] };
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    // ── 1. Validate token ─────────────────────────────────────────────────────
+    // ── 1. Validate token ────────────────────────────────────────────────────
     const id = req.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
@@ -58,9 +91,8 @@ export async function POST(req: NextRequest) {
 
     const userId = inbox.user_id as string;
 
-    // ── 2. Parse request body ─────────────────────────────────────────────────
+    // ── 2. Parse request body ────────────────────────────────────────────────
     let from = "", subject = "", text = "", html = "";
-
     const contentType = req.headers.get("content-type") ?? "";
 
     if (contentType.includes("application/json")) {
@@ -70,7 +102,6 @@ export async function POST(req: NextRequest) {
       text    = body.text    ?? "";
       html    = body.html    ?? "";
     } else if (contentType.includes("multipart/form-data")) {
-      // SendGrid Inbound Parse format (upgrade path)
       const form = await req.formData();
       from    = String(form.get("from")    ?? "");
       subject = String(form.get("subject") ?? "");
@@ -84,54 +115,69 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Empty payload" }, { status: 400 });
     }
 
-    // ── 3. Parse email → extract lead data ────────────────────────────────────
+    // ── 3. Parse email → lead data ───────────────────────────────────────────
     const parsed = parseInboundEmail(from, subject, text, html);
 
-    // Skip if we couldn't extract a phone number (not a real lead email)
+    const debugParsed = {
+      name:              parsed.name              || null,
+      phone:             parsed.phone             || null,
+      email:             parsed.email             || null,
+      location:          parsed.location          || null,
+      budget_min:        parsed.budget_min        || null,
+      budget_max:        parsed.budget_max        || null,
+      property_interest: parsed.property_interest || null,
+      source:            parsed.source,
+      message:           parsed.raw_message       || null,
+    };
+
+    // Skip if zero contact info — not a real lead email
     if (!parsed.phone && !parsed.email && !parsed.name) {
-      return NextResponse.json({ skipped: true, reason: "No contact info found" }, { status: 200 });
+      return NextResponse.json({ skipped: true, reason: "No contact info found", parsed: debugParsed });
     }
 
-    // ── 4. Deduplicate by phone, then by email ───────────────────────────────
+    // ── 4. Deduplicate — phone first, then email ─────────────────────────────
     if (parsed.phone) {
-      const { data: existing } = await supabaseAdmin
-        .from("leads")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("phone", parsed.phone)
-        .maybeSingle();
-
-      if (existing) {
-        return NextResponse.json({ skipped: true, reason: "Duplicate phone", lead_id: existing.id }, { status: 200 });
-      }
+      const { data: dup } = await supabaseAdmin
+        .from("leads").select("id")
+        .eq("user_id", userId).eq("phone", parsed.phone).maybeSingle();
+      if (dup) return NextResponse.json({ skipped: true, reason: "Duplicate phone", lead_id: dup.id, parsed: debugParsed });
     } else if (parsed.email) {
-      // No phone — fall back to email dedup
-      const { data: existing } = await supabaseAdmin
-        .from("leads")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("email", parsed.email)
-        .maybeSingle();
+      const { data: dup } = await supabaseAdmin
+        .from("leads").select("id")
+        .eq("user_id", userId).eq("email", parsed.email).maybeSingle();
+      if (dup) return NextResponse.json({ skipped: true, reason: "Duplicate email", lead_id: dup.id, parsed: debugParsed });
+    }
 
-      if (existing) {
-        return NextResponse.json({ skipped: true, reason: "Duplicate email", lead_id: existing.id }, { status: 200 });
+    // ── 5. Check sold property + find alternatives ───────────────────────────
+    const soldCheck  = await checkSoldProperty(userId, parsed);
+    let finalNotes   = parsed.notes;
+
+    if (soldCheck) {
+      const { matched, alternatives } = soldCheck;
+      finalNotes += `\n\n⚠️ May have enquired on ${matched.status} property: "${matched.title}"`;
+      if (alternatives.length) {
+        finalNotes += `\n💡 Suggest these active listings:\n` +
+          alternatives.map(a => `• ${a.title} — ${a.location}`).join("\n");
       }
     }
 
-    // ── 5. Insert lead ────────────────────────────────────────────────────────
+    // ── 6. Insert lead ───────────────────────────────────────────────────────
+    const defaultName = parsed.name || parsed.email
+      || `Lead via ${parsed.source} – ${new Date().toLocaleDateString("en-IN")}`;
+
     const { data: lead, error: insertErr } = await supabaseAdmin
       .from("leads")
       .insert({
         user_id:           userId,
-        name:              parsed.name  || parsed.email || "Unknown Lead",
-        phone:             parsed.phone,
-        email:             parsed.email,
+        name:              defaultName,
+        phone:             parsed.phone  || null,
+        email:             parsed.email  || null,
         source:            toLeadSource(parsed.source),
         budget_min:        parsed.budget_min  || 0,
         budget_max:        parsed.budget_max  || 0,
-        location:          parsed.location,
+        location:          parsed.location    || null,
         stage:             "new",
-        notes:             parsed.notes,
+        notes:             finalNotes,
         property_interest: toPropertyInterest(parsed.property_interest),
       })
       .select()
@@ -142,7 +188,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: insertErr.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, lead_id: lead.id, name: lead.name }, { status: 201 });
+    return NextResponse.json({
+      success:      true,
+      lead_id:      lead.id,
+      name:         lead.name,
+      sold_warning: soldCheck ? `May have enquired on ${soldCheck.matched.status} property` : null,
+      parsed:       debugParsed,
+    }, { status: 201 });
 
   } catch (err) {
     console.error("[inbound-email] unexpected error:", err);
@@ -150,10 +202,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Health check — GET /api/inbound-email?id=TOKEN returns status
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
-  if (!id) return NextResponse.json({ status: "PropOS Inbound Email API" }, { status: 200 });
+  if (!id) return NextResponse.json({ status: "PropOS Inbound Email API v2" });
 
   const { data: inbox } = await supabaseAdmin
     .from("user_inboxes")
