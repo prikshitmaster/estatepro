@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ skipped: true, reason: "No contact info found" }, { status: 200 });
     }
 
-    // ── 4. Deduplicate — skip if phone already exists for this user ───────────
+    // ── 4. Deduplicate by phone, then by email ───────────────────────────────
     if (parsed.phone) {
       const { data: existing } = await supabaseAdmin
         .from("leads")
@@ -103,6 +103,18 @@ export async function POST(req: NextRequest) {
 
       if (existing) {
         return NextResponse.json({ skipped: true, reason: "Duplicate phone", lead_id: existing.id }, { status: 200 });
+      }
+    } else if (parsed.email) {
+      // No phone — fall back to email dedup
+      const { data: existing } = await supabaseAdmin
+        .from("leads")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("email", parsed.email)
+        .maybeSingle();
+
+      if (existing) {
+        return NextResponse.json({ skipped: true, reason: "Duplicate email", lead_id: existing.id }, { status: 200 });
       }
     }
 
