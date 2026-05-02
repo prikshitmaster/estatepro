@@ -38,7 +38,7 @@ export default function AutoCapturePage() {
     if (connected) setGmailMsg("✅ Gmail connected! Leads will start appearing automatically.");
     if (err === "denied")           setGmailMsg("❌ You denied Gmail access. Try again.");
     if (err === "no_refresh_token") setGmailMsg("❌ Go to myaccount.google.com/permissions → remove EstatePro → reconnect.");
-    if (err === "failed")           setGmailMsg("❌ Connection failed. Try again.");
+    if (err && err !== "denied" && err !== "no_refresh_token") setGmailMsg(`❌ Connection failed: ${err}`);
   }, [searchParams]);
 
   useEffect(() => {

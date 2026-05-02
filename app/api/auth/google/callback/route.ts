@@ -60,7 +60,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${appUrl}/auto-capture?gmail_connected=true`);
 
   } catch (err) {
-    console.error("[google/callback] error:", err);
-    return NextResponse.redirect(`${appUrl}/auto-capture?gmail_error=failed`);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[google/callback] error:", msg);
+    return NextResponse.redirect(`${appUrl}/auto-capture?gmail_error=${encodeURIComponent(msg)}`);
   }
 }
