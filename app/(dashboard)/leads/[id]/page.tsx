@@ -154,6 +154,7 @@ export default function LeadDetailPage({ params }: Props) {
   const [deleting,         setDeleting]         = useState(false);
   const [notes,            setNotes]            = useState("");
   const [matchedProperties, setMatchedProperties] = useState<MatchResult<Property>>({ perfect: [], close: [] });
+  const [allProperties,     setAllProperties]     = useState<Property[]>([]);
 
   const saveTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -171,13 +172,21 @@ export default function LeadDetailPage({ params }: Props) {
         fn(data.user_id).then((l) => setLogs(l.filter((x) => x.lead_id === id)))
       ).catch(() => {});
 
-      // Load all properties and compute matches based on lead's requirements
+      // Load all properties and store them — matches recompute whenever lead changes
       getAllProperties().then((props) => {
+        setAllProperties(props);
         setMatchedProperties(matchPropertiesToLead(data, props));
       }).catch(() => {});
     }
     load();
   }, []); // eslint-disable-line
+
+  // Recompute matches whenever lead budget/location/type changes
+  useEffect(() => {
+    if (lead && allProperties.length > 0) {
+      setMatchedProperties(matchPropertiesToLead(lead, allProperties));
+    }
+  }, [lead?.budget_min, lead?.budget_max, lead?.location, lead?.property_interest]); // eslint-disable-line
 
   // Auto-save helper — debounces saves so we don't hit Supabase on every keystroke
   const save = useCallback((changes: Partial<Lead>) => {
@@ -445,7 +454,19 @@ export default function LeadDetailPage({ params }: Props) {
       )}
 
       {/* ── Matched Properties (two tiers) ── */}
-      {(matchedProperties.perfect.length > 0 || matchedProperties.close.length > 0) && (
+      <div className="flex flex-col gap-2">
+        {matchedProperties.perfect.length === 0 && matchedProperties.close.length === 0 && allProperties.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 text-center">
+            <p className="text-2xl mb-2">🔍</p>
+            <p className="text-sm font-semibold text-gray-700">No matching properties yet</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {lead.location || lead.property_interest
+                ? `No available properties match ${[lead.property_interest, lead.location].filter(Boolean).join(" in ")}`
+                : "Set a budget, location, and property type to see suggestions"}
+            </p>
+          </div>
+        )}
+        {(matchedProperties.perfect.length > 0 || matchedProperties.close.length > 0) && (
         <div className="flex flex-col gap-2">
 
           {/* ── Tier 1: Perfect Match ── */}
@@ -492,7 +513,8 @@ export default function LeadDetailPage({ params }: Props) {
           )}
 
         </div>
-      )}
+        )}
+      </div>
 
       {/* ── Quick Actions ── */}
       <div className="grid grid-cols-2 gap-3">
