@@ -26,10 +26,10 @@ export default function SignupPage() {
   const [success, setSuccess]   = useState(false);
 
   // Tracks which OAuth button is mid-redirect
-  const [oauthLoading, setOauthLoading] = useState<"google" | "facebook" | null>(null);
+  const [oauthLoading, setOauthLoading] = useState<"google" | "facebook" | "azure" | null>(null);
 
   // ─── Social login / signup handler ───────────────────────────────────────
-  async function handleOAuth(provider: "google" | "facebook") {
+  async function handleOAuth(provider: "google" | "facebook" | "azure") {
     setError("");
     setOauthLoading(provider);
 
@@ -141,12 +141,23 @@ export default function SignupPage() {
               </svg>
               {oauthLoading === "facebook" ? "Redirecting…" : "Sign up with Facebook"}
             </button>
+
+            {/* Microsoft / Outlook button */}
+            <button
+              type="button"
+              onClick={() => handleOAuth("azure")}
+              disabled={anyLoading}
+              className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-60 text-gray-700 font-medium rounded-xl transition-colors text-sm"
+            >
+              <svg width="18" height="18" viewBox="0 0 23 23"><path fill="#f3f3f3" d="M0 0h23v23H0z"/><path fill="#f35325" d="M1 1h10v10H1z"/><path fill="#81bc06" d="M12 1h10v10H12z"/><path fill="#05a6f0" d="M1 12h10v10H1z"/><path fill="#ffba08" d="M12 12h10v10H12z"/></svg>
+              {oauthLoading === "azure" ? "Redirecting…" : "Sign up with Microsoft"}
+            </button>
           </div>
 
           {/* ── "or" divider ── */}
           <div className="flex items-center gap-3 my-6">
             <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs text-gray-400 font-medium">or sign up with email</span>
+            <span className="text-xs text-gray-400 font-medium">or continue with email</span>
             <div className="flex-1 h-px bg-gray-200" />
           </div>
 
