@@ -386,26 +386,34 @@ export default function FollowUpsPage() {
               </div>
 
               {/* ── Outcome buttons ── */}
-              <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="flex flex-col gap-2 mb-3">
                 <button onClick={() => handleOutcome("called")} disabled={logging}
-                  className="flex flex-col items-center gap-2 py-5 rounded-2xl font-bold text-sm transition-all active:scale-95 disabled:opacity-50"
-                  style={{ background: "#D1FAE5", color: "#065F46" }}>
-                  <span className="text-3xl">✅</span>Called
+                  className="flex items-center gap-3 w-full px-4 py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98] disabled:opacity-50 text-left"
+                  style={{ background: "#F0FDF4", color: "#15803D", border: "1px solid #BBF7D0" }}>
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: "#22C55E" }} />
+                  Called — reached the lead
+                  <svg className="w-4 h-4 ml-auto text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                 </button>
                 <button onClick={() => handleOutcome("no_answer")} disabled={logging}
-                  className="flex flex-col items-center gap-2 py-5 rounded-2xl font-bold text-sm transition-all active:scale-95 disabled:opacity-50"
-                  style={{ background: "#F3F4F6", color: "#374151" }}>
-                  <span className="text-3xl">📵</span>No Answer
+                  className="flex items-center gap-3 w-full px-4 py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98] disabled:opacity-50 text-left"
+                  style={{ background: "#F9FAFB", color: "#374151", border: "1px solid #E5E7EB" }}>
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: "#9CA3AF" }} />
+                  No Answer — call not picked
+                  <svg className="w-4 h-4 ml-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                 </button>
                 <button onClick={() => handleOutcome("busy")} disabled={logging}
-                  className="flex flex-col items-center gap-2 py-5 rounded-2xl font-bold text-sm transition-all active:scale-95 disabled:opacity-50"
-                  style={{ background: "#FEE2E2", color: "#991B1B" }}>
-                  <span className="text-3xl">🔴</span>Busy
+                  className="flex items-center gap-3 w-full px-4 py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98] disabled:opacity-50 text-left"
+                  style={{ background: "#FFF7F7", color: "#B91C1C", border: "1px solid #FECACA" }}>
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: "#EF4444" }} />
+                  Busy — call back later
+                  <svg className="w-4 h-4 ml-auto text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                 </button>
                 <button onClick={() => setShowSnooze((v) => !v)} disabled={logging}
-                  className={`flex flex-col items-center gap-2 py-5 rounded-2xl font-bold text-sm transition-all active:scale-95 disabled:opacity-50 ${showSnooze ? "ring-2 ring-violet-400" : ""}`}
-                  style={{ background: "#EDE9FE", color: "#5B21B6" }}>
-                  <span className="text-3xl">💤</span>Snooze
+                  className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98] disabled:opacity-50 text-left ${showSnooze ? "ring-2 ring-violet-300" : ""}`}
+                  style={{ background: "#FAF5FF", color: "#6D28D9", border: "1px solid #DDD6FE" }}>
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: "#8B5CF6" }} />
+                  Snooze — remind me later
+                  <svg className="w-4 h-4 ml-auto text-violet-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showSnooze ? "M19 9l-7 7-7-7" : "M9 5l7 7-7 7"} /></svg>
                 </button>
               </div>
 

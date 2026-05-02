@@ -26,7 +26,7 @@ const toolItems = [
   { label: "Reports",           href: "/analytics",    icon: AnalyticsIcon,   accent: "#1BC47D" },
   { label: "Message Templates", href: "/ai-tools",     icon: AIIcon,          accent: "#1BC47D" },
   { label: "Property Links",    href: "/secure-share", icon: SecureShareIcon, accent: "#6366F1" },
-  { label: "Find Leads",        href: "/newspaper",    icon: NewspaperIcon,   accent: "#1BC47D" },
+  { label: "Newspaper Leads",   href: "/newspaper",    icon: NewspaperIcon,   accent: "#1BC47D" },
 ];
 
 function getInitials(name: string): string {
