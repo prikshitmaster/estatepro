@@ -10,16 +10,25 @@ import { supabaseAdmin }             from "@/lib/supabase-admin";
 import { parseInboundEmail }         from "@/lib/email-parser";
 import type { LeadSource, PropertyInterest } from "@/lib/types";
 
-// Portal Gmail search query — matches all known Indian real estate portals
+// Gmail search query — portals + direct buyer emails
 const GMAIL_QUERY = [
+  // Known Indian real estate portals
   "from:magicbricks.com", "from:99acres.com",   "from:housing.com",
   "from:nobroker.in",     "from:proptiger.com",  "from:squareyards.com",
   "from:commonfloor.com", "from:makaan.com",     "from:justdial.com",
   "from:sulekha.com",     "from:olx.in",         "from:quikr.com",
   "from:nestaway.com",    "from:anarock.com",     "from:zameen.com",
   "from:bayut.com",       "from:indiabulls.com",
+  // Portal notification subjects
   'subject:"new lead"',   'subject:"new enquiry"', 'subject:"buyer enquiry"',
   'subject:"lead alert"', 'subject:"property enquiry"',
+  // Direct buyer emails — common subjects people use when enquiring
+  "subject:bhk",          "subject:flat",          "subject:property",
+  "subject:house",        "subject:home",          "subject:apartment",
+  "subject:villa",        "subject:plot",          "subject:office",
+  "subject:shop",         "subject:looking",       "subject:need",
+  "subject:want",         "subject:buy",           "subject:rent",
+  "subject:enquiry",      "subject:interested",    "subject:require",
 ].join(" OR ");
 
 // ── Token helpers ─────────────────────────────────────────────────────────────
