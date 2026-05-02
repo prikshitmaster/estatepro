@@ -23,6 +23,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
+  const [success, setSuccess]   = useState(false);
 
   // Tracks which OAuth button is mid-redirect
   const [oauthLoading, setOauthLoading] = useState<"google" | "facebook" | null>(null);
@@ -65,10 +66,34 @@ export default function SignupPage() {
       return;
     }
 
-    router.push("/dashboard");
+    // If session exists immediately → email confirmation is OFF → go to dashboard
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      router.push("/dashboard");
+      return;
+    }
+
+    // No session = email confirmation is ON → show message
+    setSuccess(true);
+    setLoading(false);
   }
 
   const anyLoading = loading || oauthLoading !== null;
+
+  if (success) return (
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#F5F7FA' }}>
+      <div className="w-full max-w-md text-center bg-white rounded-2xl p-10" style={{ border: '1px solid #EEF1F6' }}>
+        <div className="text-4xl mb-4">📧</div>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Check your email</h2>
+        <p className="text-sm text-gray-500 mb-6">
+          We sent a confirmation link to <strong>{email}</strong>. Click it to activate your account, then come back to log in.
+        </p>
+        <Link href="/login" className="text-sm font-semibold hover:underline" style={{ color: '#1BC47D' }}>
+          Go to Login →
+        </Link>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#F5F7FA' }}>
