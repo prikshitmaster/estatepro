@@ -15,13 +15,14 @@ type Tab = "gmail" | "99acres" | "magicbricks" | "housing" | "test";
 export default function AutoCapturePage() {
   const router = useRouter();
 
-  const [uniqueId,   setUniqueId]   = useState("");
-  const [loading,    setLoading]    = useState(true);
-  const [creating,   setCreating]   = useState(false);
-  const [activeTab,  setActiveTab]  = useState<Tab>("gmail");
-  const [copied,     setCopied]     = useState(false);
-  const [testResult, setTestResult] = useState<string | null>(null);
-  const [testing,    setTesting]    = useState(false);
+  const [uniqueId,    setUniqueId]    = useState("");
+  const [loading,     setLoading]     = useState(true);
+  const [creating,    setCreating]    = useState(false);
+  const [setupError,  setSetupError]  = useState<string | null>(null);
+  const [activeTab,   setActiveTab]   = useState<Tab>("gmail");
+  const [copied,      setCopied]      = useState(false);
+  const [testResult,  setTestResult]  = useState<string | null>(null);
+  const [testing,     setTesting]     = useState(false);
 
   // Get or create the user's inbox token
   useEffect(() => {
@@ -30,23 +31,34 @@ export default function AutoCapturePage() {
       if (!user) { router.replace("/login"); return; }
 
       // Check if inbox already exists
-      const { data: existing } = await supabase
+      const { data: existing, error: fetchErr } = await supabase
         .from("user_inboxes")
         .select("unique_id")
         .eq("user_id", user.id)
         .single();
+
+      if (fetchErr && fetchErr.code !== "PGRST116") {
+        // PGRST116 = row not found (normal). Anything else = table missing or DB error.
+        setSetupError("Database table missing. Run the SQL migration first (see instructions below).");
+        setLoading(false);
+        return;
+      }
 
       if (existing) {
         setUniqueId(existing.unique_id);
       } else {
         // Create one
         setCreating(true);
-        const { data: created } = await supabase
+        const { data: created, error: insertErr } = await supabase
           .from("user_inboxes")
           .insert({ user_id: user.id })
           .select("unique_id")
           .single();
-        if (created) setUniqueId(created.unique_id);
+        if (insertErr) {
+          setSetupError("Could not create inbox. Run the SQL migration first (see instructions below).");
+        } else if (created) {
+          setUniqueId(created.unique_id);
+        }
         setCreating(false);
       }
       setLoading(false);
@@ -82,10 +94,12 @@ export default function AutoCapturePage() {
       });
       const json = await res.json();
       if (json.success)      setTestResult("✅ Success! Check your Leads page — a test lead was created.");
-      else if (json.skipped) setTestResult(`⚠️ Skipped: ${json.reason} (phone already exists — working correctly!)`);
-      else                   setTestResult(`❌ Error: ${json.error}`);
+      else if (json.skipped) setTestResult(`⚠️ Skipped: ${json.reason} — working correctly! (duplicate phone)`);
+      else if (json.error === "Invalid token") setTestResult("❌ Invalid token — your webhook URL may be wrong. Try refreshing the page.");
+      else if (json.error === "Inbox disabled") setTestResult("❌ Inbox is disabled. Contact support.");
+      else                   setTestResult(`❌ Error: ${json.error || "Unknown error (status " + res.status + ")"}`);
     } catch {
-      setTestResult("❌ Could not reach the API. Make sure the app is deployed.");
+      setTestResult("❌ Could not reach the API. Make sure the app is deployed on Vercel and you are using the Vercel URL.");
     }
     setTesting(false);
   }
@@ -146,6 +160,28 @@ function checkNewLeads() {
     <div className="p-6 flex flex-col items-center justify-center min-h-[60vh] gap-3">
       <div className="w-12 h-12 rounded-full border-4 border-emerald-200 border-t-emerald-500 animate-spin" />
       <p className="text-sm text-gray-400">{creating ? "Setting up your inbox…" : "Loading…"}</p>
+    </div>
+  );
+
+  if (setupError) return (
+    <div className="p-4 sm:p-6 max-w-2xl mx-auto pb-28">
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-5 mb-5">
+        <p className="text-sm font-bold text-red-800 mb-1">⚠️ Setup Required</p>
+        <p className="text-sm text-red-700 mb-4">{setupError}</p>
+        <p className="text-xs font-bold text-red-800 mb-2">Run this SQL in Supabase → SQL Editor:</p>
+        <div className="bg-red-900 rounded-xl p-3 font-mono text-xs text-red-100 whitespace-pre overflow-x-auto">{`CREATE TABLE IF NOT EXISTS user_inboxes (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  unique_id  TEXT UNIQUE NOT NULL DEFAULT replace(gen_random_uuid()::text, '-', ''),
+  active     BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE user_inboxes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users manage own inbox" ON user_inboxes FOR ALL
+  USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE INDEX IF NOT EXISTS user_inboxes_unique_id_idx ON user_inboxes(unique_id);`}</div>
+        <p className="text-xs text-red-600 mt-3">After running: refresh this page.</p>
+      </div>
     </div>
   );
 
