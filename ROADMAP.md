@@ -1,7 +1,5 @@
 # Roadmap
 
-## Current Sprint
-Build MVP in 15 days
 
 ## Tasks
 - Login / Signup
@@ -12,8 +10,10 @@ Build MVP in 15 days
 - Properties page
 - Mobile responsive
 - Deploy live
+- always update you md files so you can remember and use less token and less mistake more precise
 
-## Future
+
+## now building 
 - Auto lead capture
 - AI features
 - Analytics
