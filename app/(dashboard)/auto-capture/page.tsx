@@ -97,16 +97,21 @@ export default function AutoCapturePage() {
 var WEBHOOK_URL = "${webhookUrl}";
 
 function checkNewLeads() {
-  // Search for portal lead emails (unread, last 10 min)
+  // Search for portal lead emails (unread, last 15 min)
+  // Covers all MagicBricks / 99acres sender addresses
   var query = [
-    'from:noreply@99acres.com',
-    'from:noreply@magicbricks.com',
-    'from:noreply@housing.com',
-    'from:noreply@nobroker.in',
+    'from:magicbricks.com',
+    'from:99acres.com',
+    'from:housing.com',
+    'from:nobroker.in',
+    'from:proptiger.com',
     'subject:"new lead"',
     'subject:"new enquiry"',
-    'subject:"new query"'
-  ].join(' OR ') + ' is:unread newer_than:10m';
+    'subject:"enquiry"',
+    'subject:"new query"',
+    'subject:"buyer enquiry"',
+    'subject:"property enquiry"'
+  ].join(' OR ') + ' is:unread newer_than:15m';
 
   var threads = GmailApp.search(query);
 
