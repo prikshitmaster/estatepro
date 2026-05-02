@@ -11,10 +11,11 @@ import { getFollowUpLogs } from "@/lib/db/follow-ups";
 // ── Nav item definitions ───────────────────────────────────────────────────────
 
 const mainItems = [
-  { label: "Dashboard",         href: "/dashboard",    icon: DashboardIcon,  accent: "#1BC47D" },
-  { label: "Leads",             href: "/leads",        icon: LeadsIcon,      accent: "#1BC47D" },
-  { label: "My Calls",          href: "/follow-ups",   icon: FollowUpIcon,   accent: "#1BC47D" },
-  { label: "Reminders",         href: "/tasks",        icon: TasksIcon,      accent: "#1BC47D" },
+  { label: "Dashboard",         href: "/dashboard",     icon: DashboardIcon,     accent: "#1BC47D" },
+  { label: "Leads",             href: "/leads",         icon: LeadsIcon,         accent: "#1BC47D" },
+  { label: "Auto Capture ⚡",   href: "/auto-capture",  icon: AutoCaptureIcon,   accent: "#1BC47D" },
+  { label: "My Calls",          href: "/follow-ups",    icon: FollowUpIcon,      accent: "#1BC47D" },
+  { label: "Reminders",         href: "/tasks",         icon: TasksIcon,         accent: "#1BC47D" },
 ];
 
 const toolItems = [
@@ -283,6 +284,9 @@ function NewspaperIcon({ active }: { active: boolean }) {
 }
 function SecureShareIcon({ active }: { active: boolean }) {
   return <svg className="w-4 h-4 shrink-0" style={{ color: active ? "#6366F1" : "#9CA3AF" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.2 : 1.8} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>;
+}
+function AutoCaptureIcon({ active }: { active: boolean }) {
+  return <svg className="w-4 h-4 shrink-0" style={{ color: active ? "#1BC47D" : "#9CA3AF" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.2 : 1.8} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>;
 }
 function VisitsIcon({ active }: { active: boolean }) {
   return <svg className="w-4 h-4 shrink-0" style={{ color: active ? "#1BC47D" : "#9CA3AF" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.2 : 1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>;
