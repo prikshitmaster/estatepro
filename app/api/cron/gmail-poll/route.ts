@@ -227,9 +227,13 @@ async function processConnection(conn: {
 // ── Cron endpoint ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  // Protect with secret so only cron-job.org can call this
-  const secret = req.headers.get("x-cron-secret");
-  if (secret !== process.env.CRON_SECRET) {
+  // Accept both Vercel cron (Authorization header) and cron-job.org (x-cron-secret)
+  const cronSecret    = req.headers.get("x-cron-secret");
+  const vercelAuth    = req.headers.get("authorization");
+  const isVercelCron  = vercelAuth === `Bearer ${process.env.CRON_SECRET}`;
+  const isCronJobOrg  = cronSecret === process.env.CRON_SECRET;
+
+  if (!isVercelCron && !isCronJobOrg) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -269,10 +273,14 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Allow GET for manual testing
+// Allow GET for manual testing and Vercel cron (Vercel calls GET for cron jobs)
 export async function GET(req: NextRequest) {
-  const secret = req.headers.get("x-cron-secret") ?? req.nextUrl.searchParams.get("secret");
-  if (secret !== process.env.CRON_SECRET) {
+  const cronSecret   = req.headers.get("x-cron-secret") ?? req.nextUrl.searchParams.get("secret");
+  const vercelAuth   = req.headers.get("authorization");
+  const isVercelCron = vercelAuth === `Bearer ${process.env.CRON_SECRET}`;
+  const isCronJobOrg = cronSecret === process.env.CRON_SECRET;
+
+  if (!isVercelCron && !isCronJobOrg) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return POST(req);
