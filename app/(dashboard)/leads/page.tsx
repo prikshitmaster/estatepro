@@ -1,4 +1,3 @@
-// app/(dashboard)/leads/page.tsx — FUB-style leads table with filters, sort, quick actions
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -73,6 +72,61 @@ const AVATAR_COLORS = ["#6366F1","#0EA5E9","#F59E0B","#EF4444","#8B5CF6","#14B8A
 type SortKey = "name" | "budget" | "stage" | "created";
 type SortDir = "asc" | "desc";
 
+// ── Smart Lists ────────────────────────────────────────────────────────────────
+
+type SmartListId = "all" | "hot" | "no-contact" | "new-week" | "site-visit" | "negotiating" | "follow-up" | "closed-month";
+
+const SMART_LISTS: { id: SmartListId; label: string; icon: string; filter: (l: Lead) => boolean }[] = [
+  {
+    id: "all", label: "All Leads", icon: "👥",
+    filter: () => true,
+  },
+  {
+    id: "hot", label: "Hot Leads", icon: "🔥",
+    filter: (l) => quality(score(l)) === "hot",
+  },
+  {
+    id: "no-contact", label: "No Contact 7+ Days", icon: "📵",
+    filter: (l) => {
+      if (l.stage === "closed" || l.stage === "lost") return false;
+      const days = Math.floor((Date.now() - new Date(l.created_at).getTime()) / 86400000);
+      return days >= 7;
+    },
+  },
+  {
+    id: "new-week", label: "New This Week", icon: "✨",
+    filter: (l) => {
+      const days = Math.floor((Date.now() - new Date(l.created_at).getTime()) / 86400000);
+      return days <= 7;
+    },
+  },
+  {
+    id: "site-visit", label: "Site Visit Scheduled", icon: "🏠",
+    filter: (l) => l.stage === "viewing",
+  },
+  {
+    id: "negotiating", label: "In Negotiation", icon: "🤝",
+    filter: (l) => l.stage === "negotiating",
+  },
+  {
+    id: "follow-up", label: "Follow Up Today", icon: "📅",
+    filter: (l) => {
+      if (!l.next_follow_up_at) return false;
+      const today = new Date().toISOString().slice(0, 10);
+      return l.next_follow_up_at.slice(0, 10) === today;
+    },
+  },
+  {
+    id: "closed-month", label: "Closed This Month", icon: "✅",
+    filter: (l) => {
+      if (l.stage !== "closed") return false;
+      const now = new Date();
+      const d = new Date(l.created_at);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    },
+  },
+];
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function LeadsPage() {
@@ -83,7 +137,9 @@ export default function LeadsPage() {
   const [qualFilter,  setQualFilter]  = useState<Quality | "all">("all");
   const [sortKey,     setSortKey]     = useState<SortKey>("created");
   const [sortDir,     setSortDir]     = useState<SortDir>("desc");
-  const [stagePop,    setStagePop]    = useState<string | null>(null); // lead id with open stage popover
+  const [stagePop,    setStagePop]    = useState<string | null>(null);
+  const [smartList,   setSmartList]   = useState<SmartListId>("all");
+  const [sidebarOpen, setSidebarOpen] = useState(false); // mobile smart-list panel
 
   useEffect(() => {
     getAllLeads().then(setLeads).catch(() => {}).finally(() => setLoading(false));
@@ -116,10 +172,13 @@ export default function LeadsPage() {
     return c;
   }, [leads]);
 
+  const smartListFn = useMemo(() => SMART_LISTS.find((sl) => sl.id === smartList)?.filter ?? (() => true), [smartList]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return leads
       .filter((l) => {
+        if (!smartListFn(l)) return false;
         if (stageFilter !== "all" && l.stage !== stageFilter) return false;
         if (qualFilter  !== "all" && quality(score(l)) !== qualFilter) return false;
         if (q && !l.name.toLowerCase().includes(q) && !l.phone.includes(q) && !(l.location ?? "").toLowerCase().includes(q)) return false;
@@ -133,7 +192,11 @@ export default function LeadsPage() {
         if (sortKey === "created") cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [leads, search, stageFilter, qualFilter, sortKey, sortDir]);
+  }, [leads, search, stageFilter, qualFilter, sortKey, sortDir, smartListFn]);
+
+  const smartListCounts = useMemo(() =>
+    Object.fromEntries(SMART_LISTS.map((sl) => [sl.id, leads.filter(sl.filter).length]))
+  , [leads]);
 
   function SortIcon({ k }: { k: SortKey }) {
     if (sortKey !== k) return <svg className="w-3 h-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>;
@@ -142,37 +205,102 @@ export default function LeadsPage() {
       : <svg className="w-3 h-3" style={{ color: "#1BC47D" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>;
   }
 
+  const activeSmartList = SMART_LISTS.find((sl) => sl.id === smartList)!;
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full">
+
+      {/* ══ Smart Lists Left Panel — desktop always visible, mobile drawer ══ */}
+
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/30 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      {/* Sidebar */}
+      <div className={`
+        fixed inset-y-0 left-0 z-50 w-56 bg-white flex flex-col transition-transform duration-200
+        md:static md:translate-x-0 md:z-auto md:min-h-0
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+      `} style={{ borderRight: "1px solid #E5E7EB" }}>
+        <div className="px-4 pt-4 pb-2 shrink-0">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Smart Lists</p>
+        </div>
+        <div className="flex-1 overflow-y-auto py-1">
+          {SMART_LISTS.map((sl) => {
+            const on = smartList === sl.id;
+            const cnt = smartListCounts[sl.id] ?? 0;
+            return (
+              <button key={sl.id}
+                onClick={() => { setSmartList(sl.id); setStageFilter("all"); setQualFilter("all"); setSidebarOpen(false); }}
+                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-colors text-left"
+                style={{
+                  background: on ? "#F0FDF9" : "transparent",
+                  color: on ? "#1BC47D" : "#374151",
+                  fontWeight: on ? 600 : 400,
+                  borderRight: on ? "3px solid #1BC47D" : "3px solid transparent",
+                }}>
+                <span className="text-base shrink-0">{sl.icon}</span>
+                <span className="flex-1 truncate text-xs">{sl.label}</span>
+                {cnt > 0 && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                    style={{ background: on ? "#1BC47D22" : "#F3F4F6", color: on ? "#1BC47D" : "#9CA3AF" }}>
+                    {cnt}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <div className="px-4 py-3 shrink-0" style={{ borderTop: "1px solid #F3F4F6" }}>
+          <Link href="/leads/new"
+            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-white text-xs font-semibold transition-opacity hover:opacity-90"
+            style={{ background: "#1BC47D" }}>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+            Add Lead
+          </Link>
+        </div>
+      </div>
+
+      {/* ══ Right content ══ */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
 
       {/* ── Header bar ── */}
-      <div className="bg-white px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3" style={{ borderBottom: "1px solid #E5E7EB" }}>
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div>
-            <h1 className="text-lg font-bold" style={{ color: "#111827" }}>Leads</h1>
-            <p className="text-xs" style={{ color: "#9CA3AF" }}>
-              {loading ? "Loading…" : `${filtered.length} of ${leads.length}`}
-            </p>
-          </div>
+      <div className="bg-white px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid #E5E7EB" }}>
+        {/* Mobile: Smart List toggle */}
+        <button onClick={() => setSidebarOpen(true)}
+          className="md:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 shrink-0 transition-colors hover:bg-gray-50"
+          style={{ color: "#374151" }}>
+          <span>{activeSmartList.icon}</span>
+          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
 
-          {/* Search */}
-          <div className="flex items-center gap-2 flex-1 max-w-xs rounded-xl px-3 py-2" style={{ background: "#F9FAFB", border: "1px solid #E5E7EB" }}>
-            <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-            <input
-              type="text"
-              placeholder="Search..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 text-sm text-gray-700 placeholder-gray-400 outline-none bg-transparent min-w-0"
-            />
-            {search && <button onClick={() => setSearch("")} className="text-gray-300 hover:text-gray-500">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>}
-          </div>
+        {/* Title */}
+        <div className="shrink-0 hidden md:block">
+          <h1 className="text-base font-bold text-gray-900">{activeSmartList.label}</h1>
+          <p className="text-xs text-gray-400">{loading ? "Loading…" : `${filtered.length} leads`}</p>
+        </div>
+        <p className="text-xs text-gray-400 md:hidden">{loading ? "Loading…" : `${filtered.length} leads`}</p>
+
+        {/* Search */}
+        <div className="flex items-center gap-2 flex-1 rounded-xl px-3 py-2" style={{ background: "#F9FAFB", border: "1px solid #E5E7EB" }}>
+          <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          <input
+            type="text"
+            placeholder="Search leads..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 text-sm text-gray-700 placeholder-gray-400 outline-none bg-transparent min-w-0"
+          />
+          {search && <button onClick={() => setSearch("")} className="text-gray-300 hover:text-gray-500">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>}
         </div>
 
         <Link href="/leads/new"
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-sm font-semibold shrink-0 transition-opacity hover:opacity-90 active:opacity-80"
+          className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-white text-sm font-semibold shrink-0 transition-opacity hover:opacity-90"
           style={{ background: "#1BC47D" }}>
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
           Add Lead
@@ -466,6 +594,8 @@ export default function LeadsPage() {
           })}
         </div>
       </div>
+
+      </div>{/* end right content */}
     </div>
   );
 }
