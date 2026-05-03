@@ -5,22 +5,21 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getLeadById, updateLead, deleteLead } from "@/lib/db/leads";
 import { getAllProperties } from "@/lib/db/properties";
-import { getFollowUpLogs } from "@/lib/db/follow-ups";
 import { formatPrice } from "@/lib/mock-data";
-import { Lead, LeadStage, LeadSource, FollowUpLog, Property } from "@/lib/types";
+import { Lead, LeadStage, LeadSource, Property } from "@/lib/types";
 import { matchPropertiesToLead, budgetDiff, MatchResult } from "@/lib/match-utils";
+import { logActivity, getLeadActivity, ActivityLog, ActivityType, ACTIVITY_ICON, ACTIVITY_COLOR } from "@/lib/db/activity-logs";
+import { getLeadTags, getAllTags, addTagToLead, removeTagFromLead, Tag } from "@/lib/db/tags";
 
 interface Props { params: Promise<{ id: string }> }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const STAGES: { value: LeadStage; label: string; color: string; dot: string }[] = [
-  { value: "new",         label: "New Enquiry",    color: "bg-blue-100 text-blue-700 border-blue-300",       dot: "bg-blue-500"   },
-  { value: "contacted",   label: "Contacted",      color: "bg-amber-100 text-amber-700 border-amber-300",    dot: "bg-amber-500"  },
-  { value: "viewing",     label: "Site Visit",     color: "bg-violet-100 text-violet-700 border-violet-300", dot: "bg-violet-500" },
-  { value: "negotiating", label: "In Talks",       color: "bg-orange-100 text-orange-700 border-orange-300", dot: "bg-orange-500" },
-  { value: "closed",      label: "Deal Done",      color: "bg-emerald-100 text-emerald-700 border-emerald-300", dot: "bg-emerald-500" },
-  { value: "lost",        label: "Not Interested", color: "bg-red-100 text-red-600 border-red-300",          dot: "bg-red-400"    },
+const STAGES: { value: LeadStage; label: string; color: string; bg: string }[] = [
+  { value: "new",         label: "New Enquiry",    color: "#3B82F6", bg: "#EFF6FF" },
+  { value: "contacted",   label: "Contacted",      color: "#F59E0B", bg: "#FFFBEB" },
+  { value: "viewing",     label: "Site Visit",     color: "#8B5CF6", bg: "#F5F3FF" },
+  { value: "negotiating", label: "In Talks",       color: "#F97316", bg: "#FFF7ED" },
+  { value: "closed",      label: "Deal Done",      color: "#1BC47D", bg: "#F0FDF9" },
+  { value: "lost",        label: "Not Interested", color: "#EF4444", bg: "#FEF2F2" },
 ];
 
 const PROPERTY_TYPES = ["1BHK", "2BHK", "3BHK", "4BHK", "Villa", "Plot", "Commercial"];
@@ -33,25 +32,19 @@ const BUDGET_PRESETS = [
   { label: "₹1Cr",   value: 10000000 },
   { label: "₹1.5Cr", value: 15000000 },
   { label: "₹2Cr",   value: 20000000 },
-  { label: "₹2Cr+",  value: 30000000 },
+  { label: "₹3Cr+",  value: 30000000 },
 ];
 
 const SOURCES: LeadSource[] = ["website", "referral", "social", "walk-in", "ad", "other"];
 
-const OUTCOME_LABEL: Record<string, string> = {
-  called: "📞 Called", no_answer: "📵 No Answer", busy: "🔴 Busy",
-  callback: "🔄 Call Back", visited: "🏠 Site Visit", note: "📝 Note",
-};
+const LOG_TYPES: { type: ActivityType; label: string; icon: string; placeholder: string }[] = [
+  { type: "note",     label: "Note",     icon: "📝", placeholder: "Add a note about this lead…" },
+  { type: "call",     label: "Call",     icon: "📞", placeholder: "How did the call go?" },
+  { type: "whatsapp", label: "WhatsApp", icon: "💬", placeholder: "WhatsApp message sent/received…" },
+  { type: "email",    label: "Email",    icon: "📧", placeholder: "Email details…" },
+  { type: "visit",    label: "Visit",    icon: "🏠", placeholder: "Visit details…" },
+];
 
-function fmtAgo(dateStr: string): string {
-  const d = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
-  if (d === 0) return "Today";
-  if (d === 1) return "Yesterday";
-  if (d < 7)  return `${d} days ago`;
-  return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-}
-
-// ── Parse budget string (e.g. "35L", "1.2Cr", "5000000") ─────────────────────
 function parseBudget(raw: string): number | null {
   const s = raw.trim().toLowerCase();
   const m = s.match(/^(\d+\.?\d*)\s*(l|lakh|lac|cr|crore)?$/);
@@ -63,45 +56,13 @@ function parseBudget(raw: string): number | null {
   return Math.round(n);
 }
 
-// ── Custom budget input ────────────────────────────────────────────────────────
-function CustomBudgetInput({ onSave }: { onSave: (v: number) => void }) {
-  const [val, setVal]   = useState("");
-  const [err, setErr]   = useState(false);
-
-  function commit() {
-    if (!val.trim()) return;
-    const parsed = parseBudget(val);
-    if (!parsed || parsed <= 0) { setErr(true); return; }
-    setErr(false);
-    onSave(parsed);
-    setVal("");
-  }
-
-  return (
-    <div className="flex items-center gap-2 mt-1">
-      <input
-        type="text"
-        value={val}
-        onChange={(e) => { setVal(e.target.value); setErr(false); }}
-        onBlur={commit}
-        onKeyDown={(e) => { if (e.key === "Enter") commit(); }}
-        placeholder="e.g. 35L or 1.2Cr"
-        className={`flex-1 px-3 py-1.5 text-xs rounded-xl border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-          err ? "border-red-300 bg-red-50 placeholder-red-300" : "border-gray-200 bg-gray-50 placeholder-gray-400"
-        }`}
-      />
-      <button
-        onMouseDown={(e) => { e.preventDefault(); commit(); }}
-        className="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shrink-0"
-      >
-        Set
-      </button>
-      {err && <span className="text-[10px] text-red-500 shrink-0">Invalid format</span>}
-    </div>
-  );
+function fmtDate(dateStr: string): string {
+  const d = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+  if (d === 0) return "Today " + new Date(dateStr).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+  if (d === 1) return "Yesterday";
+  if (d < 7)  return `${d} days ago`;
+  return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
-
-// ── Inline text field ─────────────────────────────────────────────────────────
 
 function InlineText({ value, placeholder, onSave, type = "text" }: {
   value: string; placeholder: string; onSave: (v: string) => void; type?: string;
@@ -111,6 +72,7 @@ function InlineText({ value, placeholder, onSave, type = "text" }: {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+  useEffect(() => { setDraft(value); }, [value]);
 
   function commit() {
     setEditing(false);
@@ -122,39 +84,54 @@ function InlineText({ value, placeholder, onSave, type = "text" }: {
       ref={inputRef} type={type} value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
-      onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setDraft(value); setEditing(false); } }}
-      className="w-full px-3 py-2 text-sm border-2 border-blue-400 rounded-xl focus:outline-none bg-white font-medium"
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit();
+        if (e.key === "Escape") { setDraft(value); setEditing(false); }
+      }}
+      className="w-full px-2 py-1 text-sm border-2 border-[#1BC47D] rounded-lg focus:outline-none bg-white"
     />
   );
 
   return (
     <button
       onClick={() => { setDraft(value); setEditing(true); }}
-      className="w-full text-left px-3 py-2 text-sm rounded-xl hover:bg-gray-100 transition-colors group flex items-center justify-between gap-2"
+      className="w-full text-left text-sm rounded-lg hover:bg-gray-50 transition-colors group flex items-center justify-between gap-2 py-0.5"
     >
-      <span className={value ? "text-gray-900 font-medium" : "text-gray-400 italic"}>{value || placeholder}</span>
-      <svg className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <span className={value ? "text-gray-900" : "text-gray-400 italic"}>{value || placeholder}</span>
+      <svg className="w-3 h-3 text-gray-300 group-hover:text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
       </svg>
     </button>
   );
 }
 
-// ── MAIN PAGE ─────────────────────────────────────────────────────────────────
-
 export default function LeadDetailPage({ params }: Props) {
   const router = useRouter();
+  const leadIdRef = useRef<string>("");
 
-  const [lead,             setLead]             = useState<Lead | null>(null);
-  const [logs,             setLogs]             = useState<FollowUpLog[]>([]);
-  const [loading,          setLoading]          = useState(true);
-  const [notFound,         setNotFound]         = useState(false);
-  const [saveStatus,       setSaveStatus]       = useState<"idle" | "saving" | "saved">("idle");
-  const [confirmDel,       setConfirmDel]       = useState(false);
-  const [deleting,         setDeleting]         = useState(false);
-  const [notes,            setNotes]            = useState("");
-  const [matchedProperties, setMatchedProperties] = useState<MatchResult<Property>>({ perfect: [], close: [] });
-  const [allProperties,     setAllProperties]     = useState<Property[]>([]);
+  const [lead,               setLead]               = useState<Lead | null>(null);
+  const [loading,            setLoading]            = useState(true);
+  const [notFound,           setNotFound]           = useState(false);
+  const [saveStatus,         setSaveStatus]         = useState<"idle" | "saving" | "saved">("idle");
+  const [confirmDel,         setConfirmDel]         = useState(false);
+  const [deleting,           setDeleting]           = useState(false);
+  const [notes,              setNotes]              = useState("");
+  const [matchedProperties,  setMatchedProperties]  = useState<MatchResult<Property>>({ perfect: [], close: [] });
+  const [allProperties,      setAllProperties]      = useState<Property[]>([]);
+  const [stageOpen,          setStageOpen]          = useState(false);
+  const [sourceOpen,         setSourceOpen]         = useState(false);
+
+  // Activity log state
+  const [activities,   setActivities]   = useState<ActivityLog[]>([]);
+  const [logType,      setLogType]      = useState<ActivityType>("note");
+  const [logContent,   setLogContent]   = useState("");
+  const [submitting,   setSubmitting]   = useState(false);
+
+  // Tags state
+  const [leadTags,    setLeadTags]    = useState<Tag[]>([]);
+  const [allTags,     setAllTags]     = useState<Tag[]>([]);
+  const [tagsOpen,    setTagsOpen]    = useState(false);
+  const tagsRef = useRef<HTMLDivElement>(null);
 
   const saveTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -162,17 +139,21 @@ export default function LeadDetailPage({ params }: Props) {
   useEffect(() => {
     async function load() {
       const { id } = await params;
+      leadIdRef.current = id;
       const data = await getLeadById(id);
       if (!data) { setNotFound(true); setLoading(false); return; }
       setLead(data);
       setNotes(data.notes ?? "");
       setLoading(false);
-      // Load follow-up logs for this lead
-      import("@/lib/db/follow-ups").then(({ getFollowUpLogs: fn }) =>
-        fn(data.user_id).then((l) => setLogs(l.filter((x) => x.lead_id === id)))
-      ).catch(() => {});
 
-      // Load all properties and store them — matches recompute whenever lead changes
+      // Load activity logs
+      getLeadActivity(id).then(setActivities).catch(() => {});
+
+      // Load tags
+      getLeadTags(id).then(setLeadTags).catch(() => {});
+      getAllTags().then(setAllTags).catch(() => {});
+
+      // Load matched properties
       getAllProperties().then((props) => {
         setAllProperties(props);
         setMatchedProperties(matchPropertiesToLead(data, props));
@@ -181,14 +162,21 @@ export default function LeadDetailPage({ params }: Props) {
     load();
   }, []); // eslint-disable-line
 
-  // Recompute matches whenever lead budget/location/type changes
   useEffect(() => {
     if (lead && allProperties.length > 0) {
       setMatchedProperties(matchPropertiesToLead(lead, allProperties));
     }
   }, [lead?.budget_min, lead?.budget_max, lead?.location, lead?.property_interest]); // eslint-disable-line
 
-  // Auto-save helper — debounces saves so we don't hit Supabase on every keystroke
+  // Close tags dropdown on outside click
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (tagsRef.current && !tagsRef.current.contains(e.target as Node)) setTagsOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, []);
+
   const save = useCallback((changes: Partial<Lead>) => {
     if (!lead) return;
     setLead((prev) => prev ? { ...prev, ...changes } : prev);
@@ -217,6 +205,17 @@ export default function LeadDetailPage({ params }: Props) {
     }, 1000);
   }
 
+  async function handleSubmitLog() {
+    if (!logContent.trim() || !lead) return;
+    setSubmitting(true);
+    try {
+      const newLog = await logActivity({ lead_id: lead.id, type: logType, content: logContent.trim() });
+      setActivities((prev) => [newLog, ...prev]);
+      setLogContent("");
+    } catch {}
+    setSubmitting(false);
+  }
+
   async function handleDelete() {
     if (!lead) return;
     setDeleting(true);
@@ -224,409 +223,566 @@ export default function LeadDetailPage({ params }: Props) {
     router.push("/leads");
   }
 
+  async function handleAddTag(tag: Tag) {
+    if (!lead) return;
+    if (leadTags.find((t) => t.id === tag.id)) return;
+    await addTagToLead(lead.id, tag.id).catch(() => {});
+    setLeadTags((prev) => [...prev, tag]);
+    setTagsOpen(false);
+  }
+
+  async function handleRemoveTag(tagId: string) {
+    if (!lead) return;
+    await removeTagFromLead(lead.id, tagId).catch(() => {});
+    setLeadTags((prev) => prev.filter((t) => t.id !== tagId));
+  }
+
   if (loading) return (
-    <div className="p-6 max-w-2xl mx-auto animate-pulse space-y-3">
-      <div className="h-8 bg-gray-200 rounded w-1/3" />
-      <div className="h-16 bg-gray-100 rounded-2xl" />
-      <div className="h-40 bg-gray-100 rounded-2xl" />
-      <div className="h-32 bg-gray-100 rounded-2xl" />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 animate-pulse space-y-4">
+      <div className="h-14 bg-gray-200 rounded-xl" />
+      <div className="flex gap-6">
+        <div className="flex-1 space-y-4">
+          <div className="h-32 bg-gray-100 rounded-xl" />
+          <div className="h-48 bg-gray-100 rounded-xl" />
+        </div>
+        <div className="w-80 hidden md:block space-y-4">
+          <div className="h-48 bg-gray-100 rounded-xl" />
+          <div className="h-32 bg-gray-100 rounded-xl" />
+        </div>
+      </div>
     </div>
   );
 
   if (notFound || !lead) return (
     <div className="p-6 text-center py-20">
-      <p className="text-gray-400">Lead not found.</p>
-      <Link href="/leads" className="text-blue-600 text-sm mt-2 block">← Back</Link>
+      <p className="text-gray-400 text-sm">Lead not found.</p>
+      <Link href="/leads" className="text-[#1BC47D] text-sm mt-2 block">← Back to Leads</Link>
     </div>
   );
 
-  const currentStage = STAGES.find((s) => s.value === lead.stage)!;
+  const currentStage = STAGES.find((s) => s.value === lead.stage) ?? STAGES[0];
+  const initials = lead.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
+  const availableTags = allTags.filter((t) => !leadTags.find((lt) => lt.id === t.id));
+  const currentLogType = LOG_TYPES.find((l) => l.type === logType) ?? LOG_TYPES[0];
 
   return (
-    <div className="p-4 sm:p-6 max-w-2xl mx-auto pb-24 sm:pb-6 space-y-4">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 pb-24 md:pb-6">
 
-      {/* ── Header ── */}
-      <div className="flex items-center gap-3">
-        <Link href="/leads" className="text-gray-400 hover:text-gray-600 shrink-0">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      {/* ── Page Header ── */}
+      <div className="flex items-center gap-3 mb-5">
+        <Link href="/leads"
+          className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-gray-100 transition-colors shrink-0">
+          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
         </Link>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-bold text-gray-900 truncate">{lead.name}</h1>
-          <p className="text-xs text-gray-400 mt-0.5 capitalize">{lead.source} · Added {fmtAgo(lead.created_at)}</p>
-        </div>
-        {/* Auto-save indicator */}
-        <div className={`text-[11px] font-semibold shrink-0 transition-all ${
-          saveStatus === "saved"  ? "text-emerald-600" :
-          saveStatus === "saving" ? "text-amber-500 animate-pulse" : "text-transparent"
-        }`}>
-          {saveStatus === "saved" ? "✓ Saved" : "Saving…"}
-        </div>
-      </div>
 
-      {/* ── Stage Pipeline ── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4">
-        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">Stage</p>
-        <div className="flex gap-1.5 flex-wrap">
-          {STAGES.map((s) => {
-            const active = lead.stage === s.value;
-            return (
-              <button
-                key={s.value}
-                onClick={() => save({ stage: s.value })}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
-                  active ? s.color + " border-current shadow-sm scale-105" : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100"
-                }`}
-              >
-                <span className={`w-2 h-2 rounded-full ${active ? s.dot : "bg-gray-300"}`} />
-                {s.label}
-              </button>
-            );
-          })}
+        {/* Avatar + Name */}
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+            style={{ background: "#1BC47D" }}>
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold text-gray-900 leading-tight truncate">{lead.name}</h1>
+            <p className="text-xs text-gray-400">
+              Added {fmtDate(lead.created_at)} · {lead.source}
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* ── Contact ── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4">
-        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">Contact</p>
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-400 w-12 shrink-0">Phone</span>
-            <div className="flex-1">
-              <InlineText value={lead.phone} placeholder="Phone number" onSave={(v) => save({ phone: v })} type="tel" />
-            </div>
-            <a href={`tel:${lead.phone}`} className="shrink-0 w-8 h-8 flex items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
-            </a>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-400 w-12 shrink-0">Email</span>
-            <div className="flex-1">
-              <InlineText value={lead.email ?? ""} placeholder="Email (optional)" onSave={(v) => save({ email: v })} type="email" />
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-400 w-12 shrink-0">Name</span>
-            <div className="flex-1">
-              <InlineText value={lead.name} placeholder="Full name" onSave={(v) => save({ name: v })} />
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-400 w-12 shrink-0">Location</span>
-            <div className="flex-1">
-              <InlineText value={lead.location ?? ""} placeholder="Area, City" onSave={(v) => save({ location: v })} />
-            </div>
-          </div>
-          {/* Source */}
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-400 w-12 shrink-0">Source</span>
-            <div className="flex flex-wrap gap-1.5 flex-1">
-              {SOURCES.map((s) => (
-                <button key={s} onClick={() => save({ source: s })}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-semibold capitalize transition-colors ${
-                    lead.source === s ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                  }`}
-                >
-                  {s}
+        {/* Stage badge */}
+        <div className="relative shrink-0" >
+          <button
+            onClick={() => setStageOpen((v) => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all"
+            style={{ color: currentStage.color, background: currentStage.bg, borderColor: currentStage.color + "33" }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: currentStage.color }} />
+            {currentStage.label}
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {stageOpen && (
+            <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-xl z-50 py-1 w-44 border border-gray-100">
+              {STAGES.map((s) => (
+                <button key={s.value} onClick={() => { save({ stage: s.value }); setStageOpen(false); }}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
+                  style={{ color: lead.stage === s.value ? s.color : "#374151", fontWeight: lead.stage === s.value ? 600 : 400 }}>
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
+                  {s.label}
+                  {lead.stage === s.value && <span className="ml-auto text-[10px]">✓</span>}
                 </button>
               ))}
             </div>
-          </div>
+          )}
         </div>
+
+        {/* Save status */}
+        <span className={`text-[11px] font-semibold shrink-0 transition-all ${
+          saveStatus === "saved"  ? "text-[#1BC47D]" :
+          saveStatus === "saving" ? "text-amber-500 animate-pulse" : "text-transparent"
+        }`}>
+          {saveStatus === "saved" ? "✓ Saved" : "Saving…"}
+        </span>
       </div>
 
-      {/* ── Requirements ── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-4">
-        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Looking For</p>
-
-        {/* Property type chips */}
-        <div>
-          <p className="text-xs text-gray-500 mb-2">Property type</p>
-          <div className="flex flex-wrap gap-1.5">
-            {PROPERTY_TYPES.map((t) => (
-              <button key={t} onClick={() => save({ property_interest: t as Lead["property_interest"] })}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                  lead.property_interest === t
-                    ? "bg-blue-600 text-white border-blue-600 scale-105"
-                    : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Budget quick-pick */}
-        <div>
-          <p className="text-xs text-gray-500 mb-2">
-            Budget Max — currently <span className="font-bold text-gray-800">{formatPrice(lead.budget_max)}</span>
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {BUDGET_PRESETS.map((p) => (
-              <button key={p.label} onClick={() => save({ budget_max: p.value })}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                  lead.budget_max === p.value
-                    ? "bg-blue-600 text-white border-blue-600 scale-105"
-                    : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <CustomBudgetInput onSave={(v) => save({ budget_max: v })} />
-        </div>
-
-        <div>
-          <p className="text-xs text-gray-500 mb-2">
-            Budget Min — currently <span className="font-bold text-gray-800">{formatPrice(lead.budget_min)}</span>
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {BUDGET_PRESETS.map((p) => (
-              <button key={p.label} onClick={() => save({ budget_min: p.value })}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                  lead.budget_min === p.value
-                    ? "bg-indigo-600 text-white border-indigo-600 scale-105"
-                    : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <CustomBudgetInput onSave={(v) => save({ budget_min: v })} />
-        </div>
-      </div>
-
-      {/* ── Notes (auto-save) ── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Notes</p>
-          {saveStatus === "saved" && <span className="text-[10px] text-emerald-600 font-semibold">✓ Saved</span>}
-        </div>
-        <textarea
-          value={notes}
-          onChange={(e) => handleNotesChange(e.target.value)}
-          placeholder="Add notes about this lead…"
-          rows={3}
-          className="w-full text-sm text-gray-700 placeholder-gray-400 resize-none focus:outline-none leading-relaxed"
-        />
-      </div>
-
-      {/* ── Activity Feed ── */}
-      {logs.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">Activity ({logs.length})</p>
-          <div className="flex flex-col gap-3">
-            {logs.map((log) => (
-              <div key={log.id} className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-purple-50 flex items-center justify-center shrink-0 text-sm">
-                  {OUTCOME_LABEL[log.outcome]?.split(" ")[0] ?? "📝"}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-gray-700">
-                    {OUTCOME_LABEL[log.outcome] ?? log.outcome}
-                  </p>
-                  {log.note && <p className="text-[11px] text-gray-400 italic mt-0.5">&quot;{log.note}&quot;</p>}
-                  <p className="text-[10px] text-gray-300 mt-0.5">{fmtAgo(log.created_at)}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <Link href="/follow-ups" className="block text-center text-xs text-purple-600 font-semibold mt-3 hover:underline">
-            Log a call →
-          </Link>
-        </div>
-      )}
-
-      {logs.length === 0 && (
-        <Link href="/follow-ups"
-          className="flex items-center justify-between px-4 py-3 bg-purple-50 border border-purple-100 rounded-2xl hover:bg-purple-100 transition-colors">
-          <span className="text-sm font-semibold text-purple-700">📞 Log a call for this lead</span>
-          <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      {/* ── Action Buttons Row ── */}
+      <div className="flex items-center gap-2 mb-5 flex-wrap">
+        <a href={`tel:${lead.phone}`}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-90"
+          style={{ background: "#F0FDF9", color: "#1BC47D", border: "1px solid #A7F3D0" }}>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
           </svg>
-        </Link>
-      )}
+          Call
+        </a>
 
-      {/* ── Matched Properties (two tiers) ── */}
-      <div className="flex flex-col gap-2">
-        {matchedProperties.perfect.length === 0 && matchedProperties.close.length === 0 && allProperties.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 text-center">
-            <p className="text-2xl mb-2">🔍</p>
-            <p className="text-sm font-semibold text-gray-700">No matching properties yet</p>
-            <p className="text-xs text-gray-400 mt-1">
-              {lead.location || lead.property_interest
-                ? `No available properties match ${[lead.property_interest, lead.location].filter(Boolean).join(" in ")}`
-                : "Set a budget, location, and property type to see suggestions"}
-            </p>
-          </div>
-        )}
-        {(matchedProperties.perfect.length > 0 || matchedProperties.close.length > 0) && (
-        <div className="flex flex-col gap-2">
+        <a href={`https://wa.me/91${lead.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-90"
+          style={{ background: "#25D366", color: "#fff" }}>
+          <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+          </svg>
+          WhatsApp
+        </a>
 
-          {/* ── Tier 1: Perfect Match ── */}
-          {matchedProperties.perfect.length > 0 && (
-            <div className="rounded-2xl overflow-hidden border border-emerald-100" style={{ background: "#F0FDF9" }}>
-              <div className="px-4 pt-4 pb-3 flex items-center gap-2">
-                <span className="text-base">✅</span>
-                <div>
-                  <p className="text-sm font-bold text-emerald-800">
-                    Perfect Match ({matchedProperties.perfect.length})
-                  </p>
-                  <p className="text-[11px] text-emerald-600">Price is within {lead.name}&apos;s budget</p>
-                </div>
-              </div>
-              <div className="px-3 pb-3 flex flex-col gap-2">
-                {matchedProperties.perfect.map((prop) => (
-                  <PropertyMatchCard key={prop.id} prop={prop} lead={lead} tier="perfect" />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ── Tier 2: Close Match ── */}
-          {matchedProperties.close.length > 0 && (
-            <div className="rounded-2xl overflow-hidden border border-amber-100" style={{ background: "#FFFBEB" }}>
-              <div className="px-4 pt-4 pb-3 flex items-center gap-2">
-                <span className="text-base">🟡</span>
-                <div>
-                  <p className="text-sm font-bold text-amber-800">
-                    Close Match ({matchedProperties.close.length})
-                  </p>
-                  <p className="text-[11px] text-amber-600">Slightly above or below budget — worth showing</p>
-                </div>
-              </div>
-              <div className="px-3 pb-3 flex flex-col gap-2">
-                {matchedProperties.close.map((prop) => (
-                  <PropertyMatchCard
-                    key={prop.id} prop={prop} lead={lead} tier="close"
-                    diff={budgetDiff(prop.price, lead.budget_min ?? 0, lead.budget_max ?? 0)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-        </div>
-        )}
-      </div>
-
-      {/* ── Quick Actions ── */}
-      <div className="grid grid-cols-2 gap-3">
-        <Link
-          href={`/visits?leadName=${encodeURIComponent(lead.name)}&phone=${encodeURIComponent(lead.phone)}`}
-          className="flex items-center gap-2.5 px-4 py-3 rounded-2xl border transition-colors hover:opacity-90"
-          style={{ background: "#EFF6FF", borderColor: "#BFDBFE" }}
-        >
-          <span className="text-xl">📅</span>
-          <div>
-            <p className="text-sm font-bold text-blue-700">Schedule Visit</p>
-            <p className="text-[11px] text-blue-500">Book a site visit</p>
-          </div>
-        </Link>
-
-        <Link
-          href={`/deals?leadName=${encodeURIComponent(lead.name)}`}
-          className="flex items-center gap-2.5 px-4 py-3 rounded-2xl border transition-colors hover:opacity-90"
-          style={{ background: "#F0FDF4", borderColor: "#BBF7D0" }}
-        >
-          <span className="text-xl">💰</span>
-          <div>
-            <p className="text-sm font-bold text-emerald-700">Add Deal</p>
-            <p className="text-[11px] text-emerald-500">Record commission</p>
-          </div>
-        </Link>
-      </div>
-
-      {/* ── Quick Share Property Link ── */}
-      <Link
-        href={`/secure-share/create?title=${encodeURIComponent(lead.name + " — Property Share")}`}
-        className="flex items-center justify-between px-4 py-3 rounded-2xl border transition-colors hover:opacity-90"
-        style={{ background: '#F0FDF4', borderColor: '#BBF7D0' }}
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: '#DCFCE7' }}>
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="#16A34A">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+        {lead.email && (
+          <a href={`mailto:${lead.email}`}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-90"
+            style={{ background: "#F0F9FF", color: "#0284C7", border: "1px solid #BAE6FD" }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
-          </div>
-          <div>
-            <p className="text-sm font-semibold" style={{ color: '#15803D' }}>Share Property on WhatsApp</p>
-            <p className="text-xs" style={{ color: '#4ADE80' }}>Create a secure link for {lead.name}</p>
-          </div>
-        </div>
-        <svg className="w-4 h-4" fill="none" stroke="#16A34A" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-      </Link>
-
-      {/* ── Delete ── */}
-      <div className="pt-2">
-        {!confirmDel ? (
-          <button onClick={() => setConfirmDel(true)}
-            className="w-full py-3 border border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-500 text-sm font-medium rounded-xl transition-colors">
-            Delete Lead
-          </button>
-        ) : (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-            <p className="text-sm text-red-700 font-medium mb-3">
-              ⚠️ Permanently delete <strong>{lead.name}</strong>? This cannot be undone.
-            </p>
-            <div className="flex gap-2">
-              <button onClick={handleDelete} disabled={deleting}
-                className="flex-1 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 disabled:opacity-60">
-                {deleting ? "Deleting…" : "Yes, delete"}
-              </button>
-              <button onClick={() => setConfirmDel(false)}
-                className="flex-1 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-white">
-                Cancel
-              </button>
-            </div>
-          </div>
+            Email
+          </a>
         )}
+
+        <Link href={`/visits?leadName=${encodeURIComponent(lead.name)}&phone=${encodeURIComponent(lead.phone)}`}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-90"
+          style={{ background: "#F5F3FF", color: "#7C3AED", border: "1px solid #DDD6FE" }}>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Schedule Visit
+        </Link>
+
+        <Link href={`/deals?leadName=${encodeURIComponent(lead.name)}`}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-90"
+          style={{ background: "#F0FDF4", color: "#16A34A", border: "1px solid #BBF7D0" }}>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Add Deal
+        </Link>
       </div>
 
+      {/* ── Two-Column Body ── */}
+      <div className="flex flex-col md:flex-row gap-5 items-start">
+
+        {/* ══ LEFT: Activity Feed ══ */}
+        <div className="flex-1 min-w-0 space-y-4">
+
+          {/* Log Activity Input */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            {/* Type selector tabs */}
+            <div className="flex border-b border-gray-100">
+              {LOG_TYPES.map((lt) => (
+                <button key={lt.type} onClick={() => setLogType(lt.type)}
+                  className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors flex-1 justify-center"
+                  style={{
+                    color: logType === lt.type ? "#1BC47D" : "#6B7280",
+                    borderBottom: logType === lt.type ? "2px solid #1BC47D" : "2px solid transparent",
+                    background: "transparent"
+                  }}>
+                  <span>{lt.icon}</span>
+                  <span className="hidden sm:inline">{lt.label}</span>
+                </button>
+              ))}
+            </div>
+            {/* Text input */}
+            <div className="p-4">
+              <textarea
+                value={logContent}
+                onChange={(e) => setLogContent(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSubmitLog(); }}
+                placeholder={currentLogType.placeholder}
+                rows={3}
+                className="w-full text-sm text-gray-700 placeholder-gray-400 resize-none focus:outline-none leading-relaxed"
+              />
+              <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                <p className="text-[11px] text-gray-400">Cmd+Enter to save</p>
+                <button onClick={handleSubmitLog} disabled={!logContent.trim() || submitting}
+                  className="px-4 py-1.5 rounded-lg text-sm font-semibold text-white transition-all disabled:opacity-40"
+                  style={{ background: "#1BC47D" }}>
+                  {submitting ? "Saving…" : `Log ${currentLogType.label}`}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Activity Timeline */}
+          <div className="bg-white rounded-xl border border-gray-200">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900">Activity</h3>
+              <span className="text-xs text-gray-400">{activities.length} events</span>
+            </div>
+            {activities.length === 0 ? (
+              <div className="px-4 py-10 text-center">
+                <p className="text-3xl mb-2">💬</p>
+                <p className="text-sm text-gray-500 font-medium">No activity yet</p>
+                <p className="text-xs text-gray-400 mt-1">Log a call, note, or message above</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {activities.map((act) => (
+                  <div key={act.id} className="flex gap-3 px-4 py-3">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-base"
+                      style={{ background: ACTIVITY_COLOR[act.type as ActivityType] + "15" }}>
+                      {ACTIVITY_ICON[act.type as ActivityType] ?? "📌"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-semibold capitalize" style={{ color: ACTIVITY_COLOR[act.type as ActivityType] }}>
+                          {act.type.replace("_", " ")}
+                        </p>
+                        <span className="text-[10px] text-gray-400">{fmtDate(act.created_at)}</span>
+                      </div>
+                      {act.content && (
+                        <p className="text-sm text-gray-700 mt-0.5 leading-relaxed">{act.content}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Matched Properties */}
+          {(matchedProperties.perfect.length > 0 || matchedProperties.close.length > 0) && (
+            <div className="bg-white rounded-xl border border-gray-200">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-900">Matched Properties</h3>
+              </div>
+              <div className="p-4 space-y-3">
+                {matchedProperties.perfect.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-[#1BC47D] mb-2">✅ Perfect Match ({matchedProperties.perfect.length})</p>
+                    <div className="space-y-2">
+                      {matchedProperties.perfect.map((prop) => (
+                        <PropertyMatchCard key={prop.id} prop={prop} lead={lead} tier="perfect" />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {matchedProperties.close.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-amber-600 mb-2">🟡 Close Match ({matchedProperties.close.length})</p>
+                    <div className="space-y-2">
+                      {matchedProperties.close.map((prop) => (
+                        <PropertyMatchCard key={prop.id} prop={prop} lead={lead} tier="close"
+                          diff={budgetDiff(prop.price, lead.budget_min ?? 0, lead.budget_max ?? 0)} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+        </div>
+
+        {/* ══ RIGHT: Contact Info Panel ══ */}
+        <div className="w-full md:w-72 lg:w-80 shrink-0 space-y-4">
+
+          {/* Contact Info */}
+          <div className="bg-white rounded-xl border border-gray-200">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">Contact Info</h3>
+            </div>
+            <div className="px-4 py-3 space-y-3">
+              {/* Phone */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Phone</p>
+                <InlineText value={lead.phone} placeholder="Phone number" onSave={(v) => save({ phone: v })} type="tel" />
+              </div>
+              {/* Email */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Email</p>
+                <InlineText value={lead.email ?? ""} placeholder="Email (optional)" onSave={(v) => save({ email: v })} type="email" />
+              </div>
+              {/* Name */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Full Name</p>
+                <InlineText value={lead.name} placeholder="Full name" onSave={(v) => save({ name: v })} />
+              </div>
+              {/* Location */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Location</p>
+                <InlineText value={lead.location ?? ""} placeholder="Area, City" onSave={(v) => save({ location: v })} />
+              </div>
+              {/* Source */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Source</p>
+                <div className="relative">
+                  <button onClick={() => setSourceOpen((v) => !v)}
+                    className="w-full text-left text-sm capitalize px-2 py-1 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-between">
+                    <span className="text-gray-900">{lead.source}</span>
+                    <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {sourceOpen && (
+                    <div className="absolute left-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 w-full py-1">
+                      {SOURCES.map((s) => (
+                        <button key={s} onClick={() => { save({ source: s }); setSourceOpen(false); }}
+                          className="w-full text-left px-3 py-2 text-sm capitalize hover:bg-gray-50 transition-colors"
+                          style={{ color: lead.source === s ? "#1BC47D" : "#374151", fontWeight: lead.source === s ? 600 : 400 }}>
+                          {s}
+                          {lead.source === s && <span className="float-right">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div className="bg-white rounded-xl border border-gray-200">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900">Tags</h3>
+              <div ref={tagsRef} className="relative">
+                <button onClick={() => setTagsOpen((v) => !v)}
+                  className="text-xs font-semibold px-2 py-1 rounded-lg hover:bg-gray-50 transition-colors"
+                  style={{ color: "#1BC47D" }}>
+                  + Add
+                </button>
+                {tagsOpen && availableTags.length > 0 && (
+                  <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1 w-44">
+                    {availableTags.map((tag) => (
+                      <button key={tag.id} onClick={() => handleAddTag(tag)}
+                        className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-gray-50 transition-colors">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: tag.color }} />
+                        {tag.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {tagsOpen && availableTags.length === 0 && (
+                  <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-3 px-4 w-44">
+                    <p className="text-xs text-gray-400">All tags added</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="px-4 py-3">
+              {leadTags.length === 0 ? (
+                <p className="text-xs text-gray-400 italic">No tags yet</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {leadTags.map((tag) => (
+                    <span key={tag.id}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
+                      style={{ background: tag.color + "20", color: tag.color }}>
+                      {tag.name}
+                      <button onClick={() => handleRemoveTag(tag.id)}
+                        className="hover:opacity-70 transition-opacity ml-0.5">×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Requirements */}
+          <div className="bg-white rounded-xl border border-gray-200">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">Requirements</h3>
+            </div>
+            <div className="px-4 py-3 space-y-4">
+              {/* Property type */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Property Type</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {PROPERTY_TYPES.map((t) => (
+                    <button key={t} onClick={() => save({ property_interest: t as Lead["property_interest"] })}
+                      className="px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all"
+                      style={{
+                        background: lead.property_interest === t ? "#1BC47D" : "#F9FAFB",
+                        color: lead.property_interest === t ? "#fff" : "#6B7280",
+                        borderColor: lead.property_interest === t ? "#1BC47D" : "#E5E7EB"
+                      }}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Budget Max */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                  Max Budget <span className="text-gray-600 font-bold normal-case">{formatPrice(lead.budget_max)}</span>
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {BUDGET_PRESETS.map((p) => (
+                    <button key={p.label} onClick={() => save({ budget_max: p.value })}
+                      className="px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all"
+                      style={{
+                        background: lead.budget_max === p.value ? "#1BC47D" : "#F9FAFB",
+                        color: lead.budget_max === p.value ? "#fff" : "#6B7280",
+                        borderColor: lead.budget_max === p.value ? "#1BC47D" : "#E5E7EB"
+                      }}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                <CustomBudgetInput onSave={(v) => save({ budget_max: v })} />
+              </div>
+
+              {/* Budget Min */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                  Min Budget <span className="text-gray-600 font-bold normal-case">{formatPrice(lead.budget_min)}</span>
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {BUDGET_PRESETS.map((p) => (
+                    <button key={p.label} onClick={() => save({ budget_min: p.value })}
+                      className="px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all"
+                      style={{
+                        background: lead.budget_min === p.value ? "#6366F1" : "#F9FAFB",
+                        color: lead.budget_min === p.value ? "#fff" : "#6B7280",
+                        borderColor: lead.budget_min === p.value ? "#6366F1" : "#E5E7EB"
+                      }}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                <CustomBudgetInput onSave={(v) => save({ budget_min: v })} />
+              </div>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="bg-white rounded-xl border border-gray-200">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900">Notes</h3>
+              {saveStatus === "saved" && <span className="text-[10px] text-[#1BC47D] font-semibold">✓ Saved</span>}
+            </div>
+            <div className="p-4">
+              <textarea
+                value={notes}
+                onChange={(e) => handleNotesChange(e.target.value)}
+                placeholder="Add notes about this lead…"
+                rows={4}
+                className="w-full text-sm text-gray-700 placeholder-gray-400 resize-none focus:outline-none leading-relaxed"
+              />
+            </div>
+          </div>
+
+          {/* Share Property Link */}
+          <Link
+            href={`/secure-share/create?title=${encodeURIComponent(lead.name + " — Property Share")}`}
+            className="flex items-center justify-between px-4 py-3 rounded-xl border transition-all hover:opacity-90 bg-white"
+            style={{ borderColor: "#BBF7D0" }}>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#DCFCE7" }}>
+                <svg className="w-4 h-4 fill-[#16A34A]" viewBox="0 0 24 24">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-green-700">Share on WhatsApp</p>
+                <p className="text-xs text-green-600">Create a secure property link</p>
+              </div>
+            </div>
+            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+
+          {/* Delete */}
+          <div>
+            {!confirmDel ? (
+              <button onClick={() => setConfirmDel(true)}
+                className="w-full py-2.5 border border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-500 text-sm font-medium rounded-xl transition-colors">
+                Delete Lead
+              </button>
+            ) : (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                <p className="text-sm text-red-700 font-medium mb-3">
+                  Permanently delete <strong>{lead.name}</strong>? Cannot be undone.
+                </p>
+                <div className="flex gap-2">
+                  <button onClick={handleDelete} disabled={deleting}
+                    className="flex-1 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 disabled:opacity-60">
+                    {deleting ? "Deleting…" : "Delete"}
+                  </button>
+                  <button onClick={() => setConfirmDel(false)}
+                    className="flex-1 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-white">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── CustomBudgetInput ──────────────────────────────────────────────────────────
+
+function CustomBudgetInput({ onSave }: { onSave: (v: number) => void }) {
+  const [val, setVal] = useState("");
+  const [err, setErr] = useState(false);
+
+  function commit() {
+    if (!val.trim()) return;
+    const parsed = parseBudget(val);
+    if (!parsed || parsed <= 0) { setErr(true); return; }
+    setErr(false); onSave(parsed); setVal("");
+  }
+
+  return (
+    <div className="flex items-center gap-2 mt-2">
+      <input type="text" value={val}
+        onChange={(e) => { setVal(e.target.value); setErr(false); }}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === "Enter") commit(); }}
+        placeholder="e.g. 35L or 1.2Cr"
+        className={`flex-1 px-2.5 py-1.5 text-xs rounded-lg border focus:outline-none focus:ring-2 focus:ring-[#1BC47D] ${
+          err ? "border-red-300 bg-red-50" : "border-gray-200 bg-gray-50"
+        }`}
+      />
+      <button onMouseDown={(e) => { e.preventDefault(); commit(); }}
+        className="px-3 py-1.5 text-xs font-semibold text-white rounded-lg shrink-0"
+        style={{ background: "#1BC47D" }}>
+        Set
+      </button>
     </div>
   );
 }
 
 // ── PropertyMatchCard ─────────────────────────────────────────────────────────
 
-const WA_ICON = (
-  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-white shrink-0">
-    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-  </svg>
-);
-
-function PropertyMatchCard({
-  prop, lead, tier, diff = 0,
-}: {
+function PropertyMatchCard({ prop, lead, tier, diff = 0 }: {
   prop: Property; lead: Lead; tier: "perfect" | "close"; diff?: number;
 }) {
   const thumb = prop.image_url ?? prop.media_urls?.[0] ?? null;
   const waMsg = encodeURIComponent(
-    `Hi ${lead.name}! 👋\n\nI found a property that matches your requirement:\n\n🏢 *${prop.title}*\n📍 ${prop.location}\n💰 *${formatPrice(prop.price)}*\n\nWould you like to schedule a visit?\n\n_Sent via EstatePro CRM_`
+    `Hi ${lead.name}! 👋\n\nI found a property matching your requirement:\n\n🏢 *${prop.title}*\n📍 ${prop.location}\n💰 *${formatPrice(prop.price)}*\n\nWould you like to schedule a visit?`
   );
-
-  const diffLabel = diff > 0
-    ? `+${formatPrice(diff)} above budget`
-    : diff < 0
-      ? `${formatPrice(Math.abs(diff))} below budget`
-      : "";
-
-  const borderColor = tier === "perfect" ? "#A7F3D0" : "#FDE68A";
-  const badgeBg     = tier === "perfect" ? "#D1FAE5"  : "#FEF3C7";
-  const badgeText   = tier === "perfect" ? "#065F46"  : "#92400E";
+  const diffLabel = diff > 0 ? `+${formatPrice(diff)} above` : diff < 0 ? `${formatPrice(Math.abs(diff))} below` : "";
 
   return (
-    <div className="bg-white rounded-xl overflow-hidden" style={{ border: `1px solid ${borderColor}` }}>
+    <div className="rounded-xl overflow-hidden border" style={{ borderColor: tier === "perfect" ? "#A7F3D0" : "#FDE68A" }}>
       <div className="flex gap-3 p-3">
-        <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 flex items-center justify-center text-2xl"
+        <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 flex items-center justify-center text-xl"
           style={{ background: tier === "perfect" ? "#ECFDF5" : "#FFFBEB" }}>
           {thumb
             // eslint-disable-next-line @next/next/no-img-element
@@ -634,32 +790,22 @@ function PropertyMatchCard({
             : "🏢"}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-900 truncate leading-tight">{prop.title}</p>
-          <p className="text-xs text-gray-400 mt-0.5">📍 {prop.location}</p>
-          <p className="text-sm font-bold mt-1" style={{ color: "#1BC47D" }}>{formatPrice(prop.price)}</p>
-          <div className="flex gap-1 mt-1.5 flex-wrap">
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md" style={{ background: badgeBg, color: badgeText }}>
-              {tier === "perfect" ? "✓ Budget" : `~ ${diffLabel}`}
-            </span>
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md" style={{ background: badgeBg, color: badgeText }}>✓ Location</span>
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md" style={{ background: badgeBg, color: badgeText }}>✓ Type</span>
-          </div>
+          <p className="text-sm font-bold text-gray-900 truncate">{prop.title}</p>
+          <p className="text-xs text-gray-400">📍 {prop.location}</p>
+          <p className="text-sm font-bold" style={{ color: "#1BC47D" }}>{formatPrice(prop.price)}</p>
+          {diffLabel && <p className="text-[10px] text-amber-600">{diffLabel} budget</p>}
         </div>
       </div>
-      <div className="flex border-t border-gray-100">
-        <Link
-          href={`/properties/${prop.id}`}
-          className="flex-1 py-2.5 text-center text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors border-r border-gray-100"
-        >
-          View Details
+      <div className="flex border-t" style={{ borderColor: tier === "perfect" ? "#A7F3D0" : "#FDE68A" }}>
+        <Link href={`/properties/${prop.id}`}
+          className="flex-1 py-2 text-center text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors border-r border-gray-100">
+          View
         </Link>
-        <a
-          href={`https://wa.me/91${lead.phone.replace(/\D/g, "")}?text=${waMsg}`}
+        <a href={`https://wa.me/91${lead.phone.replace(/\D/g, "")}?text=${waMsg}`}
           target="_blank" rel="noopener noreferrer"
-          className="flex-1 py-2.5 text-center text-xs font-semibold text-white flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
-          style={{ background: "#25D366" }}
-        >
-          {WA_ICON} Send on WhatsApp
+          className="flex-1 py-2 text-center text-xs font-semibold text-white hover:opacity-90 transition-opacity"
+          style={{ background: "#25D366" }}>
+          Send on WhatsApp
         </a>
       </div>
     </div>
