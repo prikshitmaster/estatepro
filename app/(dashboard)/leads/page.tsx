@@ -125,6 +125,8 @@ export default function LeadsPage() {
   const [selected,    setSelected]    = useState<Set<string>>(new Set());
   const [bulkPop,     setBulkPop]     = useState(false);
   const [bulkDel,     setBulkDel]     = useState(false);
+  const [page,        setPage]        = useState(1);
+  const PAGE_SIZE = 25;
 
   useEffect(() => {
     getAllLeads().then(setLeads).catch(() => {}).finally(() => setLoading(false));
@@ -214,6 +216,12 @@ export default function LeadsPage() {
   const smartListCounts = useMemo(() =>
     Object.fromEntries(SMART_LISTS.map((sl) => [sl.id, leads.filter(sl.filter).length]))
   , [leads]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated  = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page, PAGE_SIZE]);
+
+  // Reset to page 1 whenever filters/sort change
+  useEffect(() => { setPage(1); }, [search, stageFilter, qualFilter, sortKey, sortDir, smartList]);
 
   function SortIcon({ k }: { k: SortKey }) {
     if (sortKey !== k) return <svg className="w-3 h-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>;
@@ -522,11 +530,11 @@ export default function LeadsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((lead, i) => {
+                {paginated.map((lead, i) => {
                   const q      = quality(score(lead));
                   const pill   = STAGE_PILL[lead.stage];
                   const src    = autoSource(lead.notes ?? "");
-                  const avatar = AVATAR_COLORS[i % AVATAR_COLORS.length];
+                  const avatar = AVATAR_COLORS[((page - 1) * PAGE_SIZE + i) % AVATAR_COLORS.length];
                   const isOpen = stagePop === lead.id;
 
                   return (
@@ -678,7 +686,7 @@ export default function LeadsPage() {
             </div>
           )}
 
-          {!loading && filtered.map((lead, i) => {
+          {!loading && paginated.map((lead, i) => {
             const q    = quality(score(lead));
             const pill = STAGE_PILL[lead.stage];
             const src  = autoSource(lead.notes ?? "");
@@ -686,7 +694,7 @@ export default function LeadsPage() {
               <Link key={lead.id} href={`/leads/${lead.id}`}
                 className="flex items-center gap-3 px-4 py-3.5 active:bg-gray-50 bg-white">
                 <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
-                  style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }}>
+                  style={{ background: AVATAR_COLORS[((page - 1) * PAGE_SIZE + i) % AVATAR_COLORS.length] }}>
                   {initials(lead.name)}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -718,6 +726,44 @@ export default function LeadsPage() {
             );
           })}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-white rounded-b-xl">
+            <p className="text-xs text-gray-400">
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} leads
+            </p>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const p = totalPages <= 5 ? i + 1 :
+                  page <= 3 ? i + 1 :
+                  page >= totalPages - 2 ? totalPages - 4 + i :
+                  page - 2 + i;
+                return (
+                  <button key={p} onClick={() => setPage(p)}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-semibold transition-colors"
+                    style={p === page
+                      ? { background: "#1BC47D", color: "#fff" }
+                      : { color: "#6B7280", border: "1px solid #E5E7EB" }}>
+                    {p}
+                  </button>
+                );
+              })}
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       </div>{/* end right content */}

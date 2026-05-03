@@ -1,6 +1,15 @@
 // app/_components/TopNav.tsx — FUB-style horizontal top navigation bar (desktop)
 "use client";
 
+interface Notif {
+  id: string;
+  title: string;
+  body: string;
+  read: boolean;
+  created_at: string;
+  type: string;
+}
+
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -16,6 +25,7 @@ const PRIMARY_NAV = [
 
 const MORE_NAV = [
   { label: "Auto Capture ⚡",   href: "/auto-capture"  },
+  { label: "Action Plans",      href: "/action-plans"  },
   { label: "Site Visits",       href: "/visits"        },
   { label: "Commission",        href: "/deals"         },
   { label: "Clients",           href: "/clients"       },
@@ -36,9 +46,14 @@ export default function TopNav() {
   const [searchOpen,  setSearchOpen]  = useState(false);
   const [allLeads,    setAllLeads]    = useState<{ id: string; name: string; phone: string }[]>([]);
 
+  const [notifOpen,   setNotifOpen]   = useState(false);
+  const [notifs,      setNotifs]      = useState<Notif[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
   const moreRef    = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const searchRef  = useRef<HTMLDivElement>(null);
+  const notifRef   = useRef<HTMLDivElement>(null);
 
   function isActive(href: string) {
     return pathname === href || pathname.startsWith(href + "/");
@@ -51,6 +66,22 @@ export default function TopNav() {
       if (!user) return;
       setUserName(user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "");
       setUserEmail(user.email ?? "");
+      // Try to load notifications (table may not exist yet)
+      (async () => {
+        const { data, error } = await supabase.from("notifications")
+          .select("id, title, body, read, created_at, type")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(10);
+        if (error || !data) {
+          const now = new Date().toISOString();
+          setNotifs([{ id: "1", title: "Welcome to EstatePro!", body: "Your CRM is ready. Add your first lead to get started.", read: false, created_at: now, type: "info" }]);
+          setUnreadCount(1);
+        } else {
+          setNotifs(data as Notif[]);
+          setUnreadCount(data.filter((n: Notif) => !n.read).length);
+        }
+      })();
     });
     // Load leads for global search
     import("@/lib/db/leads").then(({ getAllLeads }) =>
@@ -65,6 +96,7 @@ export default function TopNav() {
       if (moreRef.current    && !moreRef.current.contains(e.target as Node))    setMoreOpen(false);
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
       if (searchRef.current  && !searchRef.current.contains(e.target as Node))  setSearchOpen(false);
+      if (notifRef.current   && !notifRef.current.contains(e.target as Node))   setNotifOpen(false);
     }
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
@@ -211,6 +243,63 @@ export default function TopNav() {
         )}
       </div>
 
+      {/* Notifications bell */}
+      <div ref={notifRef} className="relative mr-2">
+        <button onClick={() => { setNotifOpen((v) => !v); setUnreadCount(0); }}
+          className="relative w-9 h-9 flex items-center justify-center rounded-lg transition-colors"
+          style={{ background: "transparent" }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#334155"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}>
+          <svg className="w-5 h-5" style={{ color: "#94a3b8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center rounded-full text-[9px] font-bold text-white"
+              style={{ background: "#EF4444" }}>
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
+
+        {notifOpen && (
+          <div className="absolute right-0 top-full mt-1.5 w-80 bg-white rounded-xl shadow-xl z-50 overflow-hidden"
+            style={{ border: "1px solid #E2E8F0" }}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <p className="text-sm font-semibold text-gray-900">Notifications</p>
+              {notifs.length > 0 && (
+                <button onClick={() => setNotifs([])} className="text-xs text-gray-400 hover:text-gray-600">Clear all</button>
+              )}
+            </div>
+            {notifs.length === 0 ? (
+              <div className="px-4 py-8 text-center">
+                <svg className="w-8 h-8 text-gray-200 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <p className="text-sm text-gray-400">All caught up!</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
+                {notifs.map((n) => (
+                  <div key={n.id} className={`flex items-start gap-3 px-4 py-3 ${n.read ? "" : "bg-blue-50/50"}`}>
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                      style={{ background: n.type === "alert" ? "#FEE2E2" : "#DBEAFE" }}>
+                      <svg className="w-3.5 h-3.5" style={{ color: n.type === "alert" ? "#DC2626" : "#3B82F6" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-800">{n.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{n.body}</p>
+                    </div>
+                    {!n.read && <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-2" />}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Add Lead */}
       <Link href="/leads/new"
         className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-semibold mr-3 shrink-0 transition-opacity hover:opacity-90"
@@ -252,9 +341,10 @@ export default function TopNav() {
                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 Settings
               </Link>
-              <Link href="/upgrade" onClick={() => setProfileOpen(false)}
+              <Link href="/settings/billing" onClick={() => setProfileOpen(false)}
                 className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
-                <span>⚡</span> Upgrade Plan
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                Plans & Billing
               </Link>
             </div>
             <div className="py-1" style={{ borderTop: "1px solid #F3F4F6" }}>
