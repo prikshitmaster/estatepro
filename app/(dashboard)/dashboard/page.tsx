@@ -65,45 +65,27 @@ export default function DashboardPage() {
         {/* Welcome */}
         <div>
           <h1 className="text-xl font-bold" style={{ color: "#111827" }}>
-            Good {getTimeOfDay()}, {userName.split(" ")[0] || "there"} 👋
+            Good {getTimeOfDay()}, {userName.split(" ")[0] || "there"}
           </h1>
           <p className="text-sm mt-0.5" style={{ color: "#6B7280" }}>{todayStr}</p>
         </div>
 
         {/* ── KPI cards ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiCard
-            label="Total Leads"
-            value={dbOk ? stats.total : "—"}
-            sub="All time"
-            icon="👥"
-            color="#1BC47D"
-            href="/leads"
+          <KpiCard label="Total Leads" value={dbOk ? stats.total : "—"} sub="All time" color="#1BC47D" href="/leads"
+            icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
           />
-          <KpiCard
-            label="Need to Call"
-            value={dbOk ? stats.activeFollowUps : "—"}
+          <KpiCard label="Need to Call" value={dbOk ? stats.activeFollowUps : "—"}
             sub={overdueLeads.length > 0 ? `${overdueLeads.length} overdue` : "All caught up"}
-            subColor={overdueLeads.length > 0 ? "#EF4444" : "#1BC47D"}
-            icon="📞"
-            color="#F59E0B"
-            href="/follow-ups"
+            subColor={overdueLeads.length > 0 ? "#EF4444" : "#1BC47D"} color="#F59E0B" href="/follow-ups"
+            icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>}
           />
-          <KpiCard
-            label="In Negotiation"
-            value={dbOk ? stats.activeDeals : "—"}
-            sub="Active deals"
-            icon="🤝"
-            color="#8B5CF6"
-            href="/leads"
+          <KpiCard label="In Negotiation" value={dbOk ? stats.activeDeals : "—"} sub="Active deals" color="#8B5CF6" href="/leads"
+            icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
           />
-          <KpiCard
-            label="Pipeline Value"
-            value={dbOk ? formatPrice(stats.pipelineValue) : "—"}
-            sub={`~${formatPrice(Math.round(stats.pipelineValue * 0.02))} commission`}
-            icon="💰"
-            color="#1BC47D"
-            href="/deals"
+          <KpiCard label="Pipeline Value" value={dbOk ? formatPrice(stats.pipelineValue) : "—"}
+            sub={`~${formatPrice(Math.round(stats.pipelineValue * 0.02))} commission`} color="#1BC47D" href="/deals"
+            icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
           />
         </div>
 
@@ -269,7 +251,7 @@ export default function DashboardPage() {
                 <Link href="/tasks" className="text-xs font-semibold" style={{ color: "#1BC47D" }}>All →</Link>
               </div>
               {pendingTasks.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm text-gray-400">No pending tasks 🎉</div>
+                <div className="px-4 py-6 text-center text-sm text-gray-400">No pending tasks — all clear!</div>
               ) : (
                 <div className="divide-y divide-gray-50">
                   {pendingTasks.map((t) => (
@@ -294,16 +276,16 @@ export default function DashboardPage() {
             <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
               <p className="px-4 py-3 text-sm font-semibold text-gray-800" style={{ borderBottom: "1px solid #F3F4F6" }}>Quick Actions</p>
               <div className="divide-y divide-gray-50">
-                {[
-                  { label: "Add New Lead",        href: "/leads/new",           icon: "👤" },
-                  { label: "Add Property",         href: "/properties/new",      icon: "🏢" },
-                  { label: "Schedule Site Visit",  href: "/visits",              icon: "📅" },
-                  { label: "Create Property Link", href: "/secure-share/create", icon: "🔗" },
-                  { label: "Log Commission",       href: "/deals",               icon: "💰" },
-                ].map(({ label, href, icon }) => (
+                {([
+                  { label: "Add New Lead",        href: "/leads/new",           svg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /> },
+                  { label: "Add Property",         href: "/properties/new",      svg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /> },
+                  { label: "Schedule Site Visit",  href: "/visits",              svg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /> },
+                  { label: "Create Property Link", href: "/secure-share/create", svg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /> },
+                  { label: "Log Commission",       href: "/deals",               svg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /> },
+                ] as { label: string; href: string; svg: React.ReactNode }[]).map(({ label, href, svg }) => (
                   <Link key={href} href={href}
                     className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors group">
-                    <span className="text-base shrink-0">{icon}</span>
+                    <svg className="w-4 h-4 text-gray-400 group-hover:text-[#1BC47D] transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">{svg}</svg>
                     <span className="text-sm font-medium text-gray-700 flex-1">{label}</span>
                     <svg className="w-3.5 h-3.5 text-gray-300 group-hover:text-[#1BC47D] transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -324,12 +306,14 @@ function KpiCard({
   label, value, sub, subColor = "#6B7280", icon, color, href,
 }: {
   label: string; value: number | string; sub: string; subColor?: string;
-  icon: string; color: string; href: string;
+  icon: React.ReactNode; color: string; href: string;
 }) {
   return (
     <Link href={href} className="bg-white rounded-2xl p-4 flex flex-col gap-2 group transition-shadow hover:shadow-md active:scale-[0.99]" style={{ border: "1px solid #E5E7EB" }}>
       <div className="flex items-center justify-between">
-        <span className="text-xl">{icon}</span>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: color + "15", color }}>
+          {icon}
+        </div>
         <svg className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>

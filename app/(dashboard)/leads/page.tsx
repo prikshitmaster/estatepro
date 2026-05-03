@@ -76,55 +76,37 @@ type SortDir = "asc" | "desc";
 
 type SmartListId = "all" | "hot" | "no-contact" | "new-week" | "site-visit" | "negotiating" | "follow-up" | "closed-month";
 
-const SMART_LISTS: { id: SmartListId; label: string; icon: string; filter: (l: Lead) => boolean }[] = [
-  {
-    id: "all", label: "All Leads", icon: "👥",
-    filter: () => true,
-  },
-  {
-    id: "hot", label: "Hot Leads", icon: "🔥",
-    filter: (l) => quality(score(l)) === "hot",
-  },
-  {
-    id: "no-contact", label: "No Contact 7+ Days", icon: "📵",
-    filter: (l) => {
-      if (l.stage === "closed" || l.stage === "lost") return false;
-      const days = Math.floor((Date.now() - new Date(l.created_at).getTime()) / 86400000);
-      return days >= 7;
-    },
-  },
-  {
-    id: "new-week", label: "New This Week", icon: "✨",
-    filter: (l) => {
-      const days = Math.floor((Date.now() - new Date(l.created_at).getTime()) / 86400000);
-      return days <= 7;
-    },
-  },
-  {
-    id: "site-visit", label: "Site Visit Scheduled", icon: "🏠",
-    filter: (l) => l.stage === "viewing",
-  },
-  {
-    id: "negotiating", label: "In Negotiation", icon: "🤝",
-    filter: (l) => l.stage === "negotiating",
-  },
-  {
-    id: "follow-up", label: "Follow Up Today", icon: "📅",
-    filter: (l) => {
-      if (!l.next_follow_up_at) return false;
-      const today = new Date().toISOString().slice(0, 10);
-      return l.next_follow_up_at.slice(0, 10) === today;
-    },
-  },
-  {
-    id: "closed-month", label: "Closed This Month", icon: "✅",
-    filter: (l) => {
-      if (l.stage !== "closed") return false;
-      const now = new Date();
-      const d = new Date(l.created_at);
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-    },
-  },
+// SVG icon paths for smart lists (Heroicons outline)
+const SL_ICONS: Record<SmartListId, React.ReactNode> = {
+  "all":          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />,
+  "hot":          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />,
+  "no-contact":   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />,
+  "new-week":     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />,
+  "site-visit":   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />,
+  "negotiating":  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
+  "follow-up":    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />,
+  "closed-month": <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />,
+};
+
+const SMART_LISTS: { id: SmartListId; label: string; filter: (l: Lead) => boolean }[] = [
+  { id: "all",          label: "All Leads",            filter: () => true },
+  { id: "hot",          label: "Hot Leads",            filter: (l) => quality(score(l)) === "hot" },
+  { id: "no-contact",   label: "No Contact 7+ Days",   filter: (l) => {
+    if (l.stage === "closed" || l.stage === "lost") return false;
+    return Math.floor((Date.now() - new Date(l.created_at).getTime()) / 86400000) >= 7;
+  }},
+  { id: "new-week",     label: "New This Week",        filter: (l) => Math.floor((Date.now() - new Date(l.created_at).getTime()) / 86400000) <= 7 },
+  { id: "site-visit",   label: "Site Visit Scheduled", filter: (l) => l.stage === "viewing" },
+  { id: "negotiating",  label: "In Negotiation",       filter: (l) => l.stage === "negotiating" },
+  { id: "follow-up",    label: "Follow Up Today",      filter: (l) => {
+    if (!l.next_follow_up_at) return false;
+    return l.next_follow_up_at.slice(0, 10) === new Date().toISOString().slice(0, 10);
+  }},
+  { id: "closed-month", label: "Closed This Month",   filter: (l) => {
+    if (l.stage !== "closed") return false;
+    const now = new Date(), d = new Date(l.created_at);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  }},
 ];
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -268,15 +250,17 @@ export default function LeadsPage() {
             return (
               <button key={sl.id}
                 onClick={() => { setSmartList(sl.id); setStageFilter("all"); setQualFilter("all"); setSidebarOpen(false); }}
-                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-colors text-left"
+                className="flex items-center gap-2.5 w-full px-4 py-2.5 transition-colors text-left"
                 style={{
                   background: on ? "#F0FDF9" : "transparent",
-                  color: on ? "#1BC47D" : "#374151",
-                  fontWeight: on ? 600 : 400,
+                  color: on ? "#1BC47D" : "#6B7280",
                   borderRight: on ? "3px solid #1BC47D" : "3px solid transparent",
                 }}>
-                <span className="text-base shrink-0">{sl.icon}</span>
-                <span className="flex-1 truncate text-xs">{sl.label}</span>
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  style={{ color: on ? "#1BC47D" : "#9CA3AF" }}>
+                  {SL_ICONS[sl.id]}
+                </svg>
+                <span className="flex-1 truncate text-xs font-medium">{sl.label}</span>
                 {cnt > 0 && (
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
                     style={{ background: on ? "#1BC47D22" : "#F3F4F6", color: on ? "#1BC47D" : "#9CA3AF" }}>
@@ -359,9 +343,12 @@ export default function LeadsPage() {
       <div className="bg-white px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid #E5E7EB" }}>
         {/* Mobile: Smart List toggle */}
         <button onClick={() => setSidebarOpen(true)}
-          className="md:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 shrink-0 transition-colors hover:bg-gray-50"
+          className="md:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 shrink-0 transition-colors hover:bg-gray-50"
           style={{ color: "#374151" }}>
-          <span>{activeSmartList.icon}</span>
+          <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+          <span className="text-xs">{activeSmartList.label}</span>
           <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
           </svg>
