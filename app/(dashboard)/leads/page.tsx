@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { getAllLeads, updateLead } from "@/lib/db/leads";
+import { getAllLeads, updateLead, deleteLead } from "@/lib/db/leads";
 import { formatPrice, initials, STAGE_LABEL } from "@/lib/mock-data";
 import { Lead, LeadStage } from "@/lib/types";
 
@@ -139,7 +139,10 @@ export default function LeadsPage() {
   const [sortDir,     setSortDir]     = useState<SortDir>("desc");
   const [stagePop,    setStagePop]    = useState<string | null>(null);
   const [smartList,   setSmartList]   = useState<SmartListId>("all");
-  const [sidebarOpen, setSidebarOpen] = useState(false); // mobile smart-list panel
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [selected,    setSelected]    = useState<Set<string>>(new Set());
+  const [bulkPop,     setBulkPop]     = useState(false);
+  const [bulkDel,     setBulkDel]     = useState(false);
 
   useEffect(() => {
     getAllLeads().then(setLeads).catch(() => {}).finally(() => setLoading(false));
@@ -154,6 +157,38 @@ export default function LeadsPage() {
     setLeads((prev) => prev.map((l) => l.id === id ? { ...l, stage: s } : l));
     try { await updateLead(id, { stage: s }); } catch { getAllLeads().then(setLeads); }
   }, []);
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === filtered.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map((l) => l.id)));
+    }
+  }
+
+  async function bulkChangeStage(stage: LeadStage) {
+    const ids = Array.from(selected);
+    setLeads((prev) => prev.map((l) => ids.includes(l.id) ? { ...l, stage } : l));
+    setBulkPop(false);
+    setSelected(new Set());
+    await Promise.allSettled(ids.map((id) => updateLead(id, { stage })));
+  }
+
+  async function bulkDelete() {
+    const ids = Array.from(selected);
+    setLeads((prev) => prev.filter((l) => !ids.includes(l.id)));
+    setBulkDel(false);
+    setSelected(new Set());
+    await Promise.allSettled(ids.map((id) => deleteLead(id)));
+  }
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir((d) => d === "asc" ? "desc" : "asc");
@@ -264,6 +299,61 @@ export default function LeadsPage() {
 
       {/* ══ Right content ══ */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+
+      {/* ── Bulk action bar — shown when items selected ── */}
+      {selected.size > 0 && (
+        <div className="bg-[#1e293b] px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid #334155" }}>
+          <span className="text-white text-sm font-semibold">{selected.size} selected</span>
+          <button onClick={() => setSelected(new Set())}
+            className="text-slate-400 hover:text-white text-xs transition-colors">Clear</button>
+          <div className="flex-1" />
+
+          {/* Change stage */}
+          <div className="relative">
+            <button onClick={() => { setBulkPop((v) => !v); setBulkDel(false); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-white transition-all"
+              style={{ background: "#334155" }}>
+              Change Stage
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {bulkPop && (
+              <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-xl z-50 py-1 w-44 border border-gray-100">
+                {ALL_STAGES.map((s) => (
+                  <button key={s} onClick={() => bulkChangeStage(s)}
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-gray-50 transition-colors">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                      style={{ background: STAGE_PILL[s].bg, color: STAGE_PILL[s].text }}>
+                      {STAGE_LABEL[s] ?? s}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Delete */}
+          {!bulkDel ? (
+            <button onClick={() => { setBulkDel(true); setBulkPop(false); }}
+              className="px-3 py-1.5 rounded-lg text-sm font-semibold text-red-400 hover:text-red-300 transition-colors">
+              Delete
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-red-400">Delete {selected.size} leads?</span>
+              <button onClick={bulkDelete}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors">
+                Confirm
+              </button>
+              <button onClick={() => setBulkDel(false)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition-colors">
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Header bar ── */}
       <div className="bg-white px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid #E5E7EB" }}>
@@ -389,8 +479,13 @@ export default function LeadsPage() {
             <table className="w-full">
               <thead className="sticky top-0 bg-white z-10" style={{ borderBottom: "1px solid #E5E7EB" }}>
                 <tr>
-                  <th className="px-6 py-3 text-left w-8">
-                    <span className="text-[11px] font-semibold text-gray-400">#</span>
+                  <th className="px-4 py-3 w-10">
+                    <input type="checkbox"
+                      checked={filtered.length > 0 && selected.size === filtered.length}
+                      ref={(el) => { if (el) el.indeterminate = selected.size > 0 && selected.size < filtered.length; }}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded border-gray-300 cursor-pointer accent-[#1BC47D]"
+                    />
                   </th>
                   <SortTh label="Name" sortKey="name" current={sortKey} dir={sortDir} onSort={toggleSort} />
                   <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Location</th>
@@ -416,8 +511,14 @@ export default function LeadsPage() {
                       onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.background = "#F9FAFB"}
                       onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = "white"}>
 
-                      {/* Row number */}
-                      <td className="px-6 py-3 text-xs text-gray-300">{i + 1}</td>
+                      {/* Checkbox */}
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox"
+                          checked={selected.has(lead.id)}
+                          onChange={() => toggleSelect(lead.id)}
+                          className="w-4 h-4 rounded border-gray-300 cursor-pointer accent-[#1BC47D]"
+                        />
+                      </td>
 
                       {/* Name + phone */}
                       <td className="px-4 py-3">
