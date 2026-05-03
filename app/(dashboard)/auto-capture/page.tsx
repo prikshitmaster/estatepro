@@ -155,8 +155,12 @@ export default function AutoCapturePage() {
 
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-2xl">⚡</span>
+        <div className="flex items-center gap-2.5 mb-1">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#D1FAE5" }}>
+            <svg className="w-5 h-5" style={{ color: "#1BC47D" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
           <h1 className="text-xl font-bold text-gray-900">Auto Lead Capture</h1>
           <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-700 rounded-full uppercase tracking-wide">FREE</span>
         </div>
@@ -182,8 +186,10 @@ export default function AutoCapturePage() {
           <div>
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-lg shrink-0">
-                  📧
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
                 </div>
                 <div>
                   <p className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
@@ -211,15 +217,20 @@ export default function AutoCapturePage() {
                 <p className="text-sm font-bold text-gray-900">{lastChecked ?? "Never"}</p>
               </div>
             </div>
-            <p className="text-[11px] text-gray-400 mt-3">
-              📡 Your Gmail is scanned every 5 minutes automatically. New portal leads appear instantly.
+            <p className="text-[11px] text-gray-400 mt-3 flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.14 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+              </svg>
+              Your Gmail is scanned every 5 minutes automatically. New portal leads appear instantly.
             </p>
           </div>
         ) : (
           /* Not connected state */
           <div className="text-center py-2">
-            <div className="w-14 h-14 rounded-full bg-gray-50 flex items-center justify-center text-2xl mx-auto mb-3">
-              📧
+            <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-3">
+              <svg className="w-7 h-7 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
             </div>
             <p className="text-sm font-bold text-gray-900 mb-1">Connect Your Gmail</p>
             <p className="text-xs text-gray-500 mb-4 max-w-xs mx-auto">
@@ -252,12 +263,18 @@ export default function AutoCapturePage() {
 
       {/* How it works — updated */}
       <div className="flex items-center gap-3 mb-5 px-4 py-3 bg-blue-50 border border-blue-100 rounded-2xl">
-        <div className="flex items-center gap-1 text-lg shrink-0">
-          <span>📩</span>
-          <span className="text-gray-400 text-xs mx-1">→</span>
-          <span>⚡</span>
-          <span className="text-gray-400 text-xs mx-1">→</span>
-          <span>👤</span>
+        <div className="flex items-center gap-1 shrink-0">
+          <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          <svg className="w-3 h-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+          <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <svg className="w-3 h-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+          <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
         </div>
         <p className="text-xs text-blue-700 font-medium">
           Portal email → EstatePro reads Gmail every 5 min → Lead created automatically
@@ -340,7 +357,7 @@ export default function AutoCapturePage() {
             className="py-3 text-sm font-bold text-white rounded-2xl transition-all disabled:opacity-60 active:scale-95"
             style={{ background: "#1BC47D" }}
           >
-            {testing ? "Sending…" : "🧪 Send Test Lead"}
+            {testing ? "Sending…" : "Send Test Lead"}
           </button>
 
           {testResult && (

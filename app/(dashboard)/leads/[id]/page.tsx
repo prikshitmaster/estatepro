@@ -37,12 +37,17 @@ const BUDGET_PRESETS = [
 
 const SOURCES: LeadSource[] = ["website", "referral", "social", "walk-in", "ad", "other"];
 
-const LOG_TYPES: { type: ActivityType; label: string; icon: string; placeholder: string }[] = [
-  { type: "note",     label: "Note",     icon: "📝", placeholder: "Add a note about this lead…" },
-  { type: "call",     label: "Call",     icon: "📞", placeholder: "How did the call go?" },
-  { type: "whatsapp", label: "WhatsApp", icon: "💬", placeholder: "WhatsApp message sent/received…" },
-  { type: "email",    label: "Email",    icon: "📧", placeholder: "Email details…" },
-  { type: "visit",    label: "Visit",    icon: "🏠", placeholder: "Visit details…" },
+const LOG_TYPES: { type: ActivityType; label: string; icon: React.ReactNode; placeholder: string }[] = [
+  { type: "note",     label: "Note",     placeholder: "Add a note about this lead…",
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg> },
+  { type: "call",     label: "Call",     placeholder: "How did the call go?",
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg> },
+  { type: "whatsapp", label: "WhatsApp", placeholder: "WhatsApp message sent/received…",
+    icon: <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.96 9.96 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg> },
+  { type: "email",    label: "Email",    placeholder: "Email details…",
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg> },
+  { type: "visit",    label: "Visit",    placeholder: "Visit details…",
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg> },
 ];
 
 function parseBudget(raw: string): number | null {
@@ -133,6 +138,11 @@ export default function LeadDetailPage({ params }: Props) {
   const [tagsOpen,    setTagsOpen]    = useState(false);
   const tagsRef = useRef<HTMLDivElement>(null);
 
+  // Action Plan state
+  const [actionPlans,      setActionPlans]      = useState<{ id: string; name: string }[]>([]);
+  const [assignedPlan,     setAssignedPlan]     = useState<string>("");  // plan id
+  const [planPickerOpen,   setPlanPickerOpen]   = useState(false);
+
   const saveTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -152,6 +162,17 @@ export default function LeadDetailPage({ params }: Props) {
       // Load tags
       getLeadTags(id).then(setLeadTags).catch(() => {});
       getAllTags().then(setAllTags).catch(() => {});
+
+      // Load action plans from user_metadata
+      import("@/lib/supabase").then(({ supabase }) =>
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (!user) return;
+          const plans = (user.user_metadata?.action_plans ?? []) as { id: string; name: string }[];
+          setActionPlans(plans.map((p) => ({ id: p.id, name: p.name })));
+          const assigned = (user.user_metadata?.lead_plans ?? {}) as Record<string, string>;
+          setAssignedPlan(assigned[id] ?? "");
+        })
+      );
 
       // Load matched properties
       getAllProperties().then((props) => {
@@ -176,6 +197,19 @@ export default function LeadDetailPage({ params }: Props) {
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, []);
+
+  async function assignPlan(planId: string) {
+    const { supabase } = await import("@/lib/supabase");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const existing = (user.user_metadata?.lead_plans ?? {}) as Record<string, string>;
+    const updated = { ...existing };
+    if (planId) updated[leadIdRef.current] = planId;
+    else delete updated[leadIdRef.current];
+    await supabase.auth.updateUser({ data: { lead_plans: updated } });
+    setAssignedPlan(planId);
+    setPlanPickerOpen(false);
+  }
 
   const save = useCallback((changes: Partial<Lead>) => {
     if (!lead) return;
@@ -396,7 +430,7 @@ export default function LeadDetailPage({ params }: Props) {
                     borderBottom: logType === lt.type ? "2px solid #1BC47D" : "2px solid transparent",
                     background: "transparent"
                   }}>
-                  <span>{lt.icon}</span>
+                  {lt.icon}
                   <span className="hidden sm:inline">{lt.label}</span>
                 </button>
               ))}
@@ -681,6 +715,51 @@ export default function LeadDetailPage({ params }: Props) {
               />
             </div>
           </div>
+
+          {/* Action Plan */}
+          {actionPlans.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200">
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-900">Action Plan</h3>
+                <button onClick={() => setPlanPickerOpen((v) => !v)}
+                  className="text-xs text-[#1BC47D] font-semibold hover:opacity-80">
+                  {assignedPlan ? "Change" : "Assign"}
+                </button>
+              </div>
+              {planPickerOpen ? (
+                <div className="p-3 flex flex-col gap-1.5">
+                  <button onClick={() => assignPlan("")}
+                    className="w-full text-left px-3 py-2 rounded-lg text-xs text-gray-400 hover:bg-gray-50 transition-colors">
+                    — No plan
+                  </button>
+                  {actionPlans.map((p) => (
+                    <button key={p.id} onClick={() => assignPlan(p.id)}
+                      className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                      style={{
+                        background: assignedPlan === p.id ? "#F0FDF9" : "transparent",
+                        color: assignedPlan === p.id ? "#1BC47D" : "#374151",
+                      }}>
+                      {assignedPlan === p.id && <span className="mr-1.5">✓</span>}
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-4 py-3">
+                  {assignedPlan ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-[#1BC47D]" />
+                      <p className="text-sm font-medium text-gray-800">
+                        {actionPlans.find((p) => p.id === assignedPlan)?.name ?? "Unknown plan"}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">No plan assigned — click Assign to add one</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Share Property Link */}
           <Link
