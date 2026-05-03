@@ -1,9 +1,7 @@
-// app/(dashboard)/dashboard/page.tsx — FUB-style dashboard
 "use client";
 
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getAllLeads, getDashboardStats } from "@/lib/db/leads";
 import { getAllTasks } from "@/lib/db/tasks";
@@ -22,29 +20,19 @@ const STAGE_PILL: Record<LeadStage, { bg: string; color: string }> = {
 const AVATAR_COLORS = ["#6366F1","#0EA5E9","#F59E0B","#EF4444","#8B5CF6","#14B8A6"];
 
 export default function DashboardPage() {
-  const router = useRouter();
-
   const [userName,     setUserName]     = useState("");
-  const [userEmail,    setUserEmail]    = useState("");
-  const [profileOpen,  setProfileOpen]  = useState(false);
   const [dbOk,         setDbOk]         = useState(false);
   const [stats,        setStats]        = useState({ total: 0, newLeads: 0, activeFollowUps: 0, activeDeals: 0, closed: 0, pipelineValue: 0 });
   const [recentLeads,  setRecentLeads]  = useState<Lead[]>([]);
   const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
   const [allLeads,     setAllLeads]     = useState<Lead[]>([]);
-  const [searchQuery,  setSearchQuery]  = useState("");
-  const [searchOpen,   setSearchOpen]   = useState(false);
-
-  const searchRef  = useRef<HTMLDivElement>(null);
-  const profileRef = useRef<HTMLDivElement>(null);
 
   const todayStr = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) { router.replace("/login"); return; }
+      if (!user) return;
       setUserName(user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "");
-      setUserEmail(user.email ?? "");
     });
     load();
   }, []);
@@ -60,31 +48,6 @@ export default function DashboardPage() {
     } catch { setDbOk(false); }
   }
 
-  async function handleSignOut() {
-    await supabase.auth.signOut();
-    router.push("/login");
-  }
-
-  // Close dropdowns on outside click
-  useEffect(() => {
-    function onDown(e: MouseEvent) {
-      if (searchRef.current  && !searchRef.current.contains(e.target as Node))  setSearchOpen(false);
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
-    }
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, []);
-
-  const searchResults = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return [];
-    return allLeads.filter((l) =>
-      l.name.toLowerCase().includes(q) ||
-      l.phone.includes(q) ||
-      (l.location ?? "").toLowerCase().includes(q)
-    ).slice(0, 6);
-  }, [searchQuery, allLeads]);
-
   const overdueLeads = useMemo(() => {
     const OVERDUE: Partial<Record<LeadStage, number>> = { negotiating: 1, new: 1, viewing: 2, contacted: 4 };
     const today = new Date().toISOString().slice(0, 10);
@@ -97,111 +60,7 @@ export default function DashboardPage() {
   }, [allLeads]);
 
   return (
-    <div className="flex flex-col h-full">
-
-      {/* ── Top bar (desktop) ── */}
-      <header className="hidden md:flex items-center gap-4 px-6 py-3 bg-white sticky top-0 z-20" style={{ borderBottom: "1px solid #E5E7EB" }}>
-
-        {/* Search */}
-        <div ref={searchRef} className="relative flex-1 max-w-sm">
-          <div className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: "#F9FAFB", border: "1px solid #E5E7EB" }}>
-            <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search leads, properties..."
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
-              onFocus={() => setSearchOpen(true)}
-              className="flex-1 text-sm text-gray-700 placeholder-gray-400 outline-none bg-transparent"
-            />
-            {searchQuery && (
-              <button onClick={() => { setSearchQuery(""); setSearchOpen(false); }} className="text-gray-300 hover:text-gray-500">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            )}
-          </div>
-          {searchOpen && searchResults.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-xl shadow-lg z-50 overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
-              {searchResults.map((lead) => (
-                <Link key={lead.id} href={`/leads/${lead.id}`}
-                  onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
-                  className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                    style={{ background: AVATAR_COLORS[lead.name.charCodeAt(0) % AVATAR_COLORS.length] }}>
-                    {initials(lead.name)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{lead.name}</p>
-                    <p className="text-xs text-gray-400 truncate">{lead.phone} · {lead.location}</p>
-                  </div>
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
-                    style={{ background: STAGE_PILL[lead.stage]?.bg, color: STAGE_PILL[lead.stage]?.color }}>
-                    {STAGE_LABEL[lead.stage] ?? lead.stage}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )}
-          {searchOpen && searchQuery.trim() && searchResults.length === 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-xl shadow-lg z-50 px-4 py-3 text-sm text-gray-400" style={{ border: "1px solid #E5E7EB" }}>
-              No results for &quot;{searchQuery}&quot;
-            </div>
-          )}
-        </div>
-
-        <div className="flex-1" />
-
-        {/* Quick add */}
-        <Link href="/leads/new"
-          className="flex items-center gap-1.5 px-3.5 py-2 text-white text-sm font-semibold rounded-xl transition-opacity hover:opacity-90"
-          style={{ background: "#1BC47D" }}>
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
-          Add Lead
-        </Link>
-
-        {/* Profile */}
-        <div ref={profileRef} className="relative">
-          <button
-            onClick={() => setProfileOpen((v) => !v)}
-            className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl transition-colors hover:bg-gray-50"
-            style={{ border: "1px solid #E5E7EB" }}
-          >
-            <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: "#1BC47D" }}>
-              {userName ? userName.charAt(0).toUpperCase() : "…"}
-            </div>
-            <span className="text-sm font-medium text-gray-700 hidden lg:block">{userName || "…"}</span>
-            <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-          </button>
-
-          {profileOpen && (
-            <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl z-50 overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
-              <div className="px-4 py-3.5" style={{ borderBottom: "1px solid #F3F4F6" }}>
-                <p className="text-sm font-semibold text-gray-900">{userName}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{userEmail}</p>
-              </div>
-              <div className="py-1">
-                <Link href="/settings" onClick={() => setProfileOpen(false)}
-                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  Settings
-                </Link>
-              </div>
-              <div className="py-1" style={{ borderTop: "1px solid #F3F4F6" }}>
-                <button onClick={handleSignOut}
-                  className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                  Sign out
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* ── Page body ── */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 sm:pb-6 space-y-5">
+    <div className="p-4 sm:p-6 pb-24 sm:pb-6 space-y-5 max-w-7xl mx-auto">
 
         {/* Welcome */}
         <div>
@@ -455,7 +314,6 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 }
