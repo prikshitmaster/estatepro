@@ -19,7 +19,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     // AuthGuard checks login status first — if not logged in, user never sees the layout
     <AuthGuard>
-      <div className="flex min-h-screen bg-[#F5F7FA]">
+      <div className="flex min-h-screen bg-[#F8FAFC]">
         {/* Desktop sidebar — hidden on mobile */}
         <div className="hidden md:block">
           <Sidebar />

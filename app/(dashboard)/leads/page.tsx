@@ -1,438 +1,494 @@
+// app/(dashboard)/leads/page.tsx — FUB-style leads table with filters, sort, quick actions
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { getAllLeads, updateLead } from "@/lib/db/leads";
 import { formatPrice, initials, STAGE_LABEL } from "@/lib/mock-data";
 import { Lead, LeadStage } from "@/lib/types";
 
-// ── Lead quality scoring ──────────────────────────────────────────────────────
+// ── Scoring ────────────────────────────────────────────────────────────────────
 
-const PORTAL_KEYWORDS = ["magicbricks","99acres","housing","nobroker","proptiger",
-  "squareyards","commonfloor","justdial","sulekha","olx","quikr"];
+const PORTAL_KW = ["magicbricks","99acres","housing","nobroker","proptiger",
+  "squareyards","commonfloor","justdial","sulekha","olx","quikr","makaan","anarock"];
 
-function computeScore(lead: Lead): number {
-  let score = 0;
-  const nameIsReal = lead.name &&
-    !lead.name.includes("@") &&
-    lead.name.toLowerCase() !== "unknown lead" &&
-    !PORTAL_KEYWORDS.some(k => lead.name.toLowerCase().includes(k));
-  const emailIsReal = lead.email &&
-    !PORTAL_KEYWORDS.some(k => (lead.email ?? "").includes(k));
-
-  if ((lead.phone ?? "").replace(/\D/g, "").length >= 10) score += 3;
-  if (nameIsReal)                                           score += 2;
-  if ((lead.budget_max ?? 0) > 0)                          score += 1;
-  if (lead.location)                                        score += 1;
-  if (emailIsReal)                                          score += 1;
-  if (lead.property_interest)                              score += 1;
-  if ((lead.notes ?? "").split("\n").length > 1)           score += 1;
-  return score; // max 10
+function score(lead: Lead): number {
+  let s = 0;
+  const nameReal = lead.name && !lead.name.includes("@") &&
+    !PORTAL_KW.some((k) => lead.name.toLowerCase().includes(k));
+  if ((lead.phone ?? "").replace(/\D/g, "").length >= 10) s += 3;
+  if (nameReal)                                            s += 2;
+  if ((lead.budget_max ?? 0) > 0)                         s += 1;
+  if (lead.location)                                       s += 1;
+  if (lead.email)                                          s += 1;
+  if (lead.property_interest)                             s += 1;
+  if ((lead.notes ?? "").length > 30)                     s += 1;
+  return s;
 }
 
 type Quality = "hot" | "warm" | "cold";
+function quality(s: number): Quality { return s >= 7 ? "hot" : s >= 4 ? "warm" : "cold"; }
 
-function getQuality(score: number): Quality {
-  if (score >= 7) return "hot";
-  if (score >= 4) return "warm";
-  return "cold";
-}
-
-const QUALITY_LABEL: Record<Quality, string> = {
-  hot:  "🔥 Hot",
-  warm: "🌡️ Warm",
-  cold: "❄️ Cold",
+const Q_PILL: Record<Quality, { bg: string; text: string; label: string }> = {
+  hot:  { bg: "#FEF2F2", text: "#DC2626", label: "🔥 Hot"    },
+  warm: { bg: "#FFFBEB", text: "#D97706", label: "🌡️ Warm"  },
+  cold: { bg: "#EFF6FF", text: "#3B82F6", label: "❄️ Cold"  },
 };
-const QUALITY_BG: Record<Quality, string>   = { hot: "#FEF2F2", warm: "#FFFBEB", cold: "#EFF6FF" };
-const QUALITY_TEXT: Record<Quality, string> = { hot: "#DC2626", warm: "#D97706", cold: "#3B82F6" };
 
-// ── Auto-capture source badge ─────────────────────────────────────────────────
+// ── Stage ──────────────────────────────────────────────────────────────────────
 
-const PORTAL_DISPLAY: Record<string, { label: string; bg: string; text: string }> = {
+const STAGE_PILL: Record<LeadStage, { bg: string; text: string }> = {
+  new:         { bg: "#DBEAFE", text: "#1D4ED8" },
+  contacted:   { bg: "#FEF3C7", text: "#92400E" },
+  viewing:     { bg: "#EDE9FE", text: "#5B21B6" },
+  negotiating: { bg: "#FFEDD5", text: "#9A3412" },
+  closed:      { bg: "#D1FAE5", text: "#065F46" },
+  lost:        { bg: "#FEE2E2", text: "#991B1B" },
+};
+
+const ALL_STAGES: LeadStage[] = ["new","contacted","viewing","negotiating","closed","lost"];
+
+// ── Auto-source badge ──────────────────────────────────────────────────────────
+
+const SOURCE_BADGE: Record<string, { label: string; bg: string; text: string }> = {
   magicbricks: { label: "MagicBricks", bg: "#FFF0F6", text: "#C2185B" },
   "99acres":   { label: "99acres",     bg: "#FFF3E0", text: "#E65100" },
   housing:     { label: "Housing",     bg: "#E3F2FD", text: "#1565C0" },
   nobroker:    { label: "NoBroker",    bg: "#E8F5E9", text: "#2E7D32" },
   proptiger:   { label: "PropTiger",   bg: "#EDE7F6", text: "#512DA8" },
   squareyards: { label: "SquareYards", bg: "#E0F2F1", text: "#00695C" },
-  commonfloor: { label: "CommonFloor", bg: "#FBE9E7", text: "#BF360C" },
   justdial:    { label: "JustDial",    bg: "#FFF8E1", text: "#F57F17" },
-  sulekha:     { label: "Sulekha",     bg: "#F3E5F5", text: "#6A1B9A" },
-  olx:         { label: "OLX",         bg: "#E8EAF6", text: "#283593" },
   facebook:    { label: "Facebook",    bg: "#E3F2FD", text: "#1877F2" },
   instagram:   { label: "Instagram",   bg: "#FCE4EC", text: "#C2185B" },
 };
 
-function getAutoSource(notes: string): string | null {
+function autoSource(notes: string | null) {
   const m = (notes ?? "").match(/Auto-captured from (\S+)/i);
-  return m ? m[1].toLowerCase() : null;
+  const key = m ? m[1].toLowerCase() : null;
+  return key ? (SOURCE_BADGE[key] ?? null) : null;
 }
 
-// ── Stage styles ──────────────────────────────────────────────────────────────
+const AVATAR_COLORS = ["#6366F1","#0EA5E9","#F59E0B","#EF4444","#8B5CF6","#14B8A6","#EC4899","#10B981"];
 
-const STAGE_STYLE: Record<LeadStage, string> = {
-  new:         "bg-blue-50 text-blue-600",
-  contacted:   "bg-amber-50 text-amber-600",
-  viewing:     "bg-violet-50 text-violet-600",
-  negotiating: "bg-orange-50 text-orange-600",
-  closed:      "bg-green-50 text-green-600",
-  lost:        "bg-red-50 text-red-600",
-};
-
-const ALL_STAGES: LeadStage[] = ["new", "contacted", "viewing", "negotiating", "closed", "lost"];
-
-const AVATAR_COLORS = [
-  "bg-blue-500","bg-violet-500","bg-green-500",
-  "bg-amber-500","bg-rose-500","bg-cyan-500",
-];
-
-const stageFilters: { label: string; value: LeadStage | "all" }[] = [
-  { label: "All",            value: "all"         },
-  { label: "New Enquiry",    value: "new"         },
-  { label: "Contacted",      value: "contacted"   },
-  { label: "Site Visit",     value: "viewing"     },
-  { label: "In Talks",       value: "negotiating" },
-  { label: "Deal Done",      value: "closed"      },
-  { label: "Not Interested", value: "lost"        },
-];
-
-const qualityFilters: { label: string; value: Quality | "all" }[] = [
-  { label: "All Quality", value: "all"  },
-  { label: "🔥 Hot",      value: "hot"  },
-  { label: "🌡️ Warm",    value: "warm" },
-  { label: "❄️ Cold",    value: "cold" },
-];
+type SortKey = "name" | "budget" | "stage" | "created";
+type SortDir = "asc" | "desc";
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function LeadsPage() {
-  const [leads, setLeads]               = useState<Lead[]>([]);
-  const [loading, setLoading]           = useState(true);
-  const [fetchError, setFetchError]     = useState("");
-  const [search, setSearch]             = useState("");
-  const [activeStage, setActiveStage]   = useState<LeadStage | "all">("all");
-  const [activeQuality, setActiveQuality] = useState<Quality | "all">("all");
+  const [leads,       setLeads]       = useState<Lead[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [search,      setSearch]      = useState("");
+  const [stageFilter, setStageFilter] = useState<LeadStage | "all">("all");
+  const [qualFilter,  setQualFilter]  = useState<Quality | "all">("all");
+  const [sortKey,     setSortKey]     = useState<SortKey>("created");
+  const [sortDir,     setSortDir]     = useState<SortDir>("desc");
+  const [stagePop,    setStagePop]    = useState<string | null>(null); // lead id with open stage popover
 
   useEffect(() => {
-    getAllLeads()
-      .then(setLeads)
-      .catch(() => setFetchError("Could not load leads. Check your Supabase setup."))
-      .finally(() => setLoading(false));
+    getAllLeads().then(setLeads).catch(() => {}).finally(() => setLoading(false));
+    // Close stage pop on outside click
+    function onDown() { setStagePop(null); }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
   }, []);
 
-  const handleStageChange = useCallback(async (leadId: string, newStage: LeadStage) => {
-    setLeads((prev) => prev.map((l) => l.id === leadId ? { ...l, stage: newStage } : l));
-    try {
-      await updateLead(leadId, { stage: newStage });
-    } catch {
-      getAllLeads().then(setLeads);
-    }
+  const handleStageChange = useCallback(async (id: string, s: LeadStage) => {
+    setStagePop(null);
+    setLeads((prev) => prev.map((l) => l.id === id ? { ...l, stage: s } : l));
+    try { await updateLead(id, { stage: s }); } catch { getAllLeads().then(setLeads); }
   }, []);
 
-  const filtered = leads.filter((lead) => {
-    const matchesStage = activeStage === "all" || lead.stage === activeStage;
-    const q = search.toLowerCase();
-    const matchesSearch = !q ||
-      lead.name.toLowerCase().includes(q) ||
-      (lead.location ?? "").toLowerCase().includes(q) ||
-      (lead.phone ?? "").includes(q);
-    const quality = getQuality(computeScore(lead));
-    const matchesQuality = activeQuality === "all" || quality === activeQuality;
-    return matchesStage && matchesSearch && matchesQuality;
-  });
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir((d) => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("asc"); }
+  }
 
-  // Count by quality for filter labels
-  const counts = { hot: 0, warm: 0, cold: 0 };
-  leads.forEach(l => { counts[getQuality(computeScore(l))]++; });
+  const counts = useMemo(() => {
+    const c = { hot: 0, warm: 0, cold: 0, all: leads.length };
+    leads.forEach((l) => { c[quality(score(l))]++; });
+    return c;
+  }, [leads]);
+
+  const stageCounts = useMemo(() => {
+    const c: Record<string, number> = { all: leads.length };
+    leads.forEach((l) => { c[l.stage] = (c[l.stage] ?? 0) + 1; });
+    return c;
+  }, [leads]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return leads
+      .filter((l) => {
+        if (stageFilter !== "all" && l.stage !== stageFilter) return false;
+        if (qualFilter  !== "all" && quality(score(l)) !== qualFilter) return false;
+        if (q && !l.name.toLowerCase().includes(q) && !l.phone.includes(q) && !(l.location ?? "").toLowerCase().includes(q)) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        let cmp = 0;
+        if (sortKey === "name")    cmp = a.name.localeCompare(b.name);
+        if (sortKey === "budget")  cmp = (a.budget_max ?? 0) - (b.budget_max ?? 0);
+        if (sortKey === "stage")   cmp = ALL_STAGES.indexOf(a.stage) - ALL_STAGES.indexOf(b.stage);
+        if (sortKey === "created") cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+  }, [leads, search, stageFilter, qualFilter, sortKey, sortDir]);
+
+  function SortIcon({ k }: { k: SortKey }) {
+    if (sortKey !== k) return <svg className="w-3 h-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>;
+    return sortDir === "asc"
+      ? <svg className="w-3 h-3" style={{ color: "#1BC47D" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+      : <svg className="w-3 h-3" style={{ color: "#1BC47D" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>;
+  }
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto">
+    <div className="flex flex-col h-full">
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Leads</h1>
-          <p className="text-sm text-gray-400 mt-0.5">
-            {loading ? "Loading..." : `${leads.length} total · `}
-            {!loading && (
-              <span>
-                <span style={{ color: "#DC2626" }}>🔥{counts.hot}</span>
-                {" · "}
-                <span style={{ color: "#D97706" }}>🌡️{counts.warm}</span>
-                {" · "}
-                <span style={{ color: "#3B82F6" }}>❄️{counts.cold}</span>
-              </span>
-            )}
-          </p>
+      {/* ── Header bar ── */}
+      <div className="bg-white px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3" style={{ borderBottom: "1px solid #E5E7EB" }}>
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div>
+            <h1 className="text-lg font-bold" style={{ color: "#111827" }}>Leads</h1>
+            <p className="text-xs" style={{ color: "#9CA3AF" }}>
+              {loading ? "Loading…" : `${filtered.length} of ${leads.length}`}
+            </p>
+          </div>
+
+          {/* Search */}
+          <div className="flex items-center gap-2 flex-1 max-w-xs rounded-xl px-3 py-2" style={{ background: "#F9FAFB", border: "1px solid #E5E7EB" }}>
+            <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            <input
+              type="text"
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1 text-sm text-gray-700 placeholder-gray-400 outline-none bg-transparent min-w-0"
+            />
+            {search && <button onClick={() => setSearch("")} className="text-gray-300 hover:text-gray-500">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>}
+          </div>
         </div>
-        <Link
-          href="/leads/new"
-          className="inline-flex items-center gap-2 px-5 py-2.5 text-white text-sm font-semibold rounded-xl"
-          style={{ background: "#1BC47D" }}
-        >
-          <PlusIcon /> Add Lead
+
+        <Link href="/leads/new"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-sm font-semibold shrink-0 transition-opacity hover:opacity-90 active:opacity-80"
+          style={{ background: "#1BC47D" }}>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+          Add Lead
         </Link>
       </div>
 
-      {fetchError && (
-        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
-          {fetchError}
-        </div>
-      )}
-
-      {/* Search + filters */}
-      <div className="flex flex-col gap-3 mb-5">
-        <input
-          type="text"
-          placeholder="Search by name, location or phone..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full sm:max-w-sm px-4 py-2.5 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none bg-white"
-          style={{ border: "1px solid #EEF1F6" }}
-        />
-
-        {/* Stage filter */}
-        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-          {stageFilters.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setActiveStage(f.value)}
-              className="px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors"
-              style={{
-                background: activeStage === f.value ? "#1BC47D" : "#fff",
-                color:      activeStage === f.value ? "#fff"    : "#6B7280",
-                border:     activeStage === f.value ? "1px solid #1BC47D" : "1px solid #EEF1F6",
-              }}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Quality filter */}
-        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-          {qualityFilters.map((f) => {
-            const q = f.value as Quality;
-            const isActive = activeQuality === f.value;
+      {/* ── Filter tabs ── */}
+      <div className="bg-white px-4 sm:px-6 overflow-x-auto" style={{ borderBottom: "1px solid #E5E7EB" }}>
+        <div className="flex gap-1 py-2 min-w-max">
+          {/* Stage filters */}
+          {([
+            { label: "All",         value: "all"         },
+            { label: "New",         value: "new"         },
+            { label: "Contacted",   value: "contacted"   },
+            { label: "Site Visit",  value: "viewing"     },
+            { label: "In Talks",    value: "negotiating" },
+            { label: "Deal Done",   value: "closed"      },
+            { label: "Lost",        value: "lost"        },
+          ] as { label: string; value: LeadStage | "all" }[]).map(({ label, value }) => {
+            const on = stageFilter === value;
+            const cnt = stageCounts[value] ?? 0;
             return (
-              <button
-                key={f.value}
-                onClick={() => setActiveQuality(f.value)}
-                className="px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors"
+              <button key={value} onClick={() => setStageFilter(value)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap"
                 style={{
-                  background: isActive ? (f.value === "all" ? "#1BC47D" : QUALITY_BG[q]) : "#fff",
-                  color:      isActive ? (f.value === "all" ? "#fff"    : QUALITY_TEXT[q]) : "#6B7280",
-                  border:     isActive ? `1px solid ${f.value === "all" ? "#1BC47D" : QUALITY_TEXT[q]}` : "1px solid #EEF1F6",
-                  fontWeight: isActive ? 700 : 500,
-                }}
-              >
-                {f.label}{f.value !== "all" ? ` (${counts[q]})` : ""}
+                  background: on ? "#111827" : "transparent",
+                  color: on ? "#ffffff" : "#6B7280",
+                  border: on ? "1px solid #111827" : "1px solid transparent",
+                }}>
+                {label}
+                {cnt > 0 && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                  style={{ background: on ? "#ffffff22" : "#F3F4F6", color: on ? "#fff" : "#6B7280" }}>
+                  {cnt}
+                </span>}
+              </button>
+            );
+          })}
+
+          <div className="w-px bg-gray-200 mx-1 self-stretch" />
+
+          {/* Quality filters */}
+          {(["all","hot","warm","cold"] as (Quality | "all")[]).map((v) => {
+            const on = qualFilter === v;
+            const label = v === "all" ? "All Quality" : Q_PILL[v].label;
+            return (
+              <button key={v} onClick={() => setQualFilter(v)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap"
+                style={{
+                  background: on ? (v === "all" ? "#111827" : Q_PILL[v as Quality]?.bg) : "transparent",
+                  color: on ? (v === "all" ? "#fff" : Q_PILL[v as Quality]?.text) : "#6B7280",
+                  border: on ? `1px solid ${v === "all" ? "#111827" : Q_PILL[v as Quality]?.text}44` : "1px solid transparent",
+                }}>
+                {label}
+                {v !== "all" && <span className="text-[10px]">{counts[v]}</span>}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Loading skeleton */}
-      {loading && (
-        <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex items-center gap-3 px-5 py-4 animate-pulse">
-              <div className="w-8 h-8 rounded-full bg-gray-200 shrink-0" />
-              <div className="flex-1 space-y-2">
-                <div className="h-3 bg-gray-200 rounded w-1/3" />
-                <div className="h-2.5 bg-gray-100 rounded w-1/2" />
-              </div>
-              <div className="h-5 bg-gray-200 rounded-full w-16" />
+      {/* ── Table (desktop) ── */}
+      <div className="flex-1 overflow-auto pb-24 sm:pb-0">
+        {/* Desktop table */}
+        <div className="hidden sm:block">
+          {loading ? (
+            <div className="divide-y divide-gray-50">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="flex items-center gap-4 px-6 py-4 animate-pulse">
+                  <div className="w-8 h-8 rounded-full bg-gray-100 shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3 bg-gray-100 rounded w-1/4" />
+                    <div className="h-2.5 bg-gray-50 rounded w-1/3" />
+                  </div>
+                  <div className="h-5 bg-gray-100 rounded-full w-20" />
+                  <div className="h-5 bg-gray-100 rounded-full w-16" />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Empty */}
-      {!loading && filtered.length === 0 && (
-        <div className="text-center py-16 text-gray-400 text-sm">
-          {leads.length === 0 ? "No leads yet. Add your first lead!" : "No leads match your filters."}
-        </div>
-      )}
-
-      {/* Desktop table */}
-      {!loading && filtered.length > 0 && (
-        <>
-          <div className="hidden md:block bg-white rounded-2xl overflow-visible" style={{ border: "1px solid #EEF1F6" }}>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left" style={{ borderBottom: "1px solid #F0F3F8" }}>
-                  <th className="px-5 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wide">Lead</th>
-                  <th className="px-4 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wide">Location</th>
-                  <th className="px-4 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wide">Budget</th>
-                  <th className="px-4 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wide">Source</th>
-                  <th className="px-4 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wide">Stage</th>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <span className="text-4xl">🔍</span>
+              <p className="text-gray-500 font-medium">No leads found</p>
+              <p className="text-gray-400 text-sm">Try adjusting your filters</p>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead className="sticky top-0 bg-white z-10" style={{ borderBottom: "1px solid #E5E7EB" }}>
+                <tr>
+                  <th className="px-6 py-3 text-left w-8">
+                    <span className="text-[11px] font-semibold text-gray-400">#</span>
+                  </th>
+                  <SortTh label="Name" sortKey="name" current={sortKey} dir={sortDir} onSort={toggleSort} />
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Location</th>
+                  <SortTh label="Budget" sortKey="budget" current={sortKey} dir={sortDir} onSort={toggleSort} />
+                  <SortTh label="Stage" sortKey="stage" current={sortKey} dir={sortDir} onSort={toggleSort} />
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Source</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Quality</th>
+                  <SortTh label="Added" sortKey="created" current={sortKey} dir={sortDir} onSort={toggleSort} />
+                  <th className="px-4 py-3 w-28" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F0F3F8]">
+              <tbody>
                 {filtered.map((lead, i) => {
-                  const score   = computeScore(lead);
-                  const quality = getQuality(score);
-                  const portal  = getAutoSource(lead.notes ?? "");
-                  const portalInfo = portal ? PORTAL_DISPLAY[portal] : null;
+                  const q      = quality(score(lead));
+                  const pill   = STAGE_PILL[lead.stage];
+                  const src    = autoSource(lead.notes ?? "");
+                  const avatar = AVATAR_COLORS[i % AVATAR_COLORS.length];
+                  const isOpen = stagePop === lead.id;
+
                   return (
-                    <tr key={lead.id} className="hover:bg-[#F8F9FB] transition-colors">
-                      <td className="px-5 py-3">
+                    <tr key={lead.id} className="group border-b border-gray-50 transition-colors"
+                      style={{ background: "white" }}
+                      onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.background = "#F9FAFB"}
+                      onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = "white"}>
+
+                      {/* Row number */}
+                      <td className="px-6 py-3 text-xs text-gray-300">{i + 1}</td>
+
+                      {/* Name + phone */}
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0"
+                            style={{ background: avatar }}>
                             {initials(lead.name)}
                           </div>
                           <div>
-                            <div className="flex items-center gap-1.5">
-                              <Link href={`/leads/${lead.id}`} className="font-semibold text-gray-900 hover:text-[#1BC47D] text-sm">
-                                {lead.name}
-                              </Link>
-                              {/* Quality badge inline */}
-                              <span
-                                className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                                style={{ background: QUALITY_BG[quality], color: QUALITY_TEXT[quality] }}
-                              >
-                                {QUALITY_LABEL[quality]}
-                              </span>
-                            </div>
-                            <span className="text-xs text-gray-400">{lead.phone || lead.email}</span>
+                            <Link href={`/leads/${lead.id}`}
+                              className="text-sm font-semibold text-gray-900 hover:text-[#1BC47D] transition-colors block">
+                              {lead.name}
+                            </Link>
+                            <a href={`tel:${lead.phone}`} className="text-xs text-gray-400 hover:text-[#1BC47D]">{lead.phone}</a>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{lead.location || "—"}</td>
-                      <td className="px-4 py-3 text-xs text-gray-500">
-                        {lead.budget_max ? `${formatPrice(lead.budget_min)} – ${formatPrice(lead.budget_max)}` : "—"}
+
+                      {/* Location */}
+                      <td className="px-4 py-3 text-sm text-gray-500 max-w-[140px]">
+                        <span className="truncate block">{lead.location || "—"}</span>
                       </td>
-                      <td className="px-4 py-3">
-                        {portalInfo ? (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
-                            style={{ background: portalInfo.bg, color: portalInfo.text }}
-                          >
-                            ⚡ {portalInfo.label}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-gray-500 capitalize">{lead.source}</span>
+
+                      {/* Budget */}
+                      <td className="px-4 py-3 text-sm font-medium text-gray-700">
+                        {lead.budget_max ? formatPrice(lead.budget_max) : "—"}
+                      </td>
+
+                      {/* Stage — click to change */}
+                      <td className="px-4 py-3 relative">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setStagePop(isOpen ? null : lead.id); }}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-opacity hover:opacity-80"
+                          style={{ background: pill.bg, color: pill.text }}>
+                          {STAGE_LABEL[lead.stage] ?? lead.stage}
+                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                        </button>
+
+                        {/* Stage dropdown */}
+                        {isOpen && (
+                          <div className="absolute left-0 top-full mt-1 bg-white rounded-xl shadow-lg z-30 py-1 min-w-[160px]"
+                            style={{ border: "1px solid #E5E7EB" }}
+                            onMouseDown={(e) => e.stopPropagation()}>
+                            {ALL_STAGES.map((s) => (
+                              <button key={s}
+                                onClick={() => handleStageChange(lead.id, s)}
+                                className="flex items-center gap-2.5 w-full px-3 py-2 text-left text-xs font-medium transition-colors"
+                                style={{ color: lead.stage === s ? "#1BC47D" : "#374151" }}
+                                onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.background = "#F9FAFB"}
+                                onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = ""}>
+                                {lead.stage === s && <span style={{ color: "#1BC47D", fontSize: 10 }}>✓</span>}
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                                  style={{ background: STAGE_PILL[s].bg, color: STAGE_PILL[s].text }}>
+                                  {STAGE_LABEL[s] ?? s}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
                         )}
                       </td>
+
+                      {/* Source badge */}
                       <td className="px-4 py-3">
-                        <StageBadge lead={lead} onStageChange={handleStageChange} />
+                        {src ? (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                            style={{ background: src.bg, color: src.text }}>
+                            ⚡ {src.label}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400 capitalize">{lead.source}</span>
+                        )}
+                      </td>
+
+                      {/* Quality badge */}
+                      <td className="px-4 py-3">
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                          style={{ background: Q_PILL[q].bg, color: Q_PILL[q].text }}>
+                          {Q_PILL[q].label}
+                        </span>
+                      </td>
+
+                      {/* Added date */}
+                      <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
+                        {new Date(lead.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                      </td>
+
+                      {/* Actions — show on row hover */}
+                      <td className="px-4 py-3">
+                        <div className="hidden group-hover:flex items-center gap-1.5 justify-end">
+                          <a href={`tel:${lead.phone}`}
+                            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-white transition-opacity hover:opacity-90"
+                            style={{ background: "#1BC47D" }}>
+                            Call
+                          </a>
+                          <a href={`https://wa.me/91${lead.phone.replace(/\D/g,"")}`}
+                            target="_blank" rel="noreferrer"
+                            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-white transition-opacity hover:opacity-90"
+                            style={{ background: "#25D366" }}>
+                            WA
+                          </a>
+                          <Link href={`/leads/${lead.id}`}
+                            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors"
+                            style={{ background: "#F3F4F6", color: "#374151" }}>
+                            View
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-          </div>
-
-          {/* Mobile cards */}
-          <div className="md:hidden flex flex-col gap-3">
-            {filtered.map((lead, i) => {
-              const score   = computeScore(lead);
-              const quality = getQuality(score);
-              const portal  = getAutoSource(lead.notes ?? "");
-              const portalInfo = portal ? PORTAL_DISPLAY[portal] : null;
-              return (
-                <div key={lead.id} className="bg-white rounded-2xl p-4 flex items-start justify-between" style={{ border: "1px solid #EEF1F6" }}>
-                  <Link href={`/leads/${lead.id}`} className="flex items-start gap-3 flex-1 min-w-0">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
-                      {initials(lead.name)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="font-semibold text-gray-900 text-sm truncate">{lead.name}</p>
-                        <span
-                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
-                          style={{ background: QUALITY_BG[quality], color: QUALITY_TEXT[quality] }}
-                        >
-                          {QUALITY_LABEL[quality]}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-400">{lead.phone || lead.email}</p>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <p className="text-xs text-gray-400">{lead.location || ""}{lead.budget_max ? ` · ${formatPrice(lead.budget_max)}` : ""}</p>
-                        {portalInfo && (
-                          <span
-                            className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                            style={{ background: portalInfo.bg, color: portalInfo.text }}
-                          >
-                            ⚡ {portalInfo.label}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                  <StageBadge lead={lead} onStageChange={handleStageChange} />
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// ── Stage badge with dropdown ─────────────────────────────────────────────────
-
-function StageBadge({ lead, onStageChange }: { lead: Lead; onStageChange: (id: string, stage: LeadStage) => void }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    function handleOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
-    }
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, [isOpen]);
-
-  return (
-    <div ref={ref} className="relative shrink-0">
-      <button
-        onClick={(e) => { e.stopPropagation(); setIsOpen((v) => !v); }}
-        className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${STAGE_STYLE[lead.stage]}`}
-      >
-        {STAGE_LABEL[lead.stage] ?? lead.stage}
-        <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl shadow-lg py-1 min-w-[130px]" style={{ border: "1px solid #EEF1F6" }}>
-          {ALL_STAGES.map((stage) => (
-            <button
-              key={stage}
-              onClick={(e) => { e.stopPropagation(); setIsOpen(false); onStageChange(lead.id, stage); }}
-              className="w-full text-left px-3 py-2 text-xs font-medium flex items-center gap-2 hover:bg-[#F8F9FB]"
-              style={{ color: lead.stage === stage ? "#1BC47D" : "#374151" }}
-            >
-              <span className={`w-2 h-2 rounded-full shrink-0 ${
-                stage === "new" ? "bg-blue-400" : stage === "contacted" ? "bg-amber-400" :
-                stage === "viewing" ? "bg-violet-400" : stage === "negotiating" ? "bg-orange-400" :
-                stage === "closed" ? "bg-green-400" : "bg-red-400"
-              }`} />
-              {STAGE_LABEL[stage] ?? stage}
-              {lead.stage === stage && (
-                <svg className="w-3 h-3 ml-auto" style={{ color: "#1BC47D" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </button>
-          ))}
+          )}
         </div>
-      )}
+
+        {/* ── Mobile card list ── */}
+        <div className="sm:hidden divide-y divide-gray-100">
+          {loading && [...Array(6)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-3.5 animate-pulse">
+              <div className="w-10 h-10 rounded-full bg-gray-100 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 bg-gray-100 rounded w-1/3" />
+                <div className="h-2.5 bg-gray-50 rounded w-1/2" />
+              </div>
+              <div className="h-5 bg-gray-100 rounded-full w-16" />
+            </div>
+          ))}
+
+          {!loading && filtered.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <span className="text-3xl">🔍</span>
+              <p className="text-gray-500 text-sm font-medium">No leads found</p>
+            </div>
+          )}
+
+          {!loading && filtered.map((lead, i) => {
+            const q    = quality(score(lead));
+            const pill = STAGE_PILL[lead.stage];
+            const src  = autoSource(lead.notes ?? "");
+            return (
+              <Link key={lead.id} href={`/leads/${lead.id}`}
+                className="flex items-center gap-3 px-4 py-3.5 active:bg-gray-50 bg-white">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+                  style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }}>
+                  {initials(lead.name)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{lead.name}</p>
+                    {src && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                        style={{ background: src.bg, color: src.text }}>
+                        ⚡ {src.label}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 truncate mt-0.5">
+                    {lead.phone}{lead.location ? ` · ${lead.location}` : ""}
+                    {lead.budget_max ? ` · ${formatPrice(lead.budget_max)}` : ""}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                    style={{ background: pill.bg, color: pill.text }}>
+                    {STAGE_LABEL[lead.stage] ?? lead.stage}
+                  </span>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                    style={{ background: Q_PILL[q].bg, color: Q_PILL[q].text }}>
+                    {Q_PILL[q].label}
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
 
-function PlusIcon() {
+// ── Sortable column header ────────────────────────────────────────────────────
+
+function SortTh({ label, sortKey: k, current, dir, onSort }: {
+  label: string; sortKey: SortKey; current: SortKey; dir: SortDir; onSort: (k: SortKey) => void;
+}) {
+  const active = current === k;
   return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-    </svg>
+    <th className="px-4 py-3 text-left">
+      <button onClick={() => onSort(k)}
+        className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide transition-colors"
+        style={{ color: active ? "#1BC47D" : "#9CA3AF" }}>
+        {label}
+        {active
+          ? (dir === "asc"
+            ? <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+            : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>)
+          : <svg className="w-3 h-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+        }
+      </button>
+    </th>
   );
 }

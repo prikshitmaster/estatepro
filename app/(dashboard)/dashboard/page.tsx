@@ -1,9 +1,4 @@
-// app/(dashboard)/dashboard/page.tsx — Dashboard with REAL user name + DB status
-//
-// "use client" because we need useState and useEffect to:
-//   1. Load the logged-in user's name from Supabase
-//   2. Check if the database tables are set up correctly
-//   3. Load real lead counts
+// app/(dashboard)/dashboard/page.tsx — FUB-style dashboard
 "use client";
 
 import { useEffect, useState, useRef, useMemo } from "react";
@@ -12,84 +7,57 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getAllLeads, getDashboardStats } from "@/lib/db/leads";
 import { getAllTasks } from "@/lib/db/tasks";
-import { getAllClients } from "@/lib/db/clients";
-import { getAllNewspaperLeads } from "@/lib/db/newspaper-leads";
 import { formatPrice, initials, STAGE_LABEL } from "@/lib/mock-data";
-import { Lead, LeadStage, Task, TaskPriority, NewspaperLead } from "@/lib/types";
+import { Lead, LeadStage, Task } from "@/lib/types";
 
-// ── colour maps ───────────────────────────────────────────────────────────────
-
-const STAGE_STYLE: Record<LeadStage, string> = {
-  new:         "bg-blue-50 text-blue-600",
-  contacted:   "bg-amber-50 text-amber-600",
-  viewing:     "bg-violet-50 text-violet-600",
-  negotiating: "bg-orange-50 text-orange-600",
-  closed:      "bg-green-50 text-green-600",
-  lost:        "bg-red-50 text-red-600",
+const STAGE_PILL: Record<LeadStage, { bg: string; color: string }> = {
+  new:         { bg: "#DBEAFE", color: "#1D4ED8" },
+  contacted:   { bg: "#FEF3C7", color: "#92400E" },
+  viewing:     { bg: "#EDE9FE", color: "#5B21B6" },
+  negotiating: { bg: "#FFEDD5", color: "#9A3412" },
+  closed:      { bg: "#D1FAE5", color: "#065F46" },
+  lost:        { bg: "#FEE2E2", color: "#991B1B" },
 };
 
-const PRIORITY_DOT: Record<TaskPriority, string> = {
-  high:   "bg-red-500",
-  medium: "bg-amber-400",
-  low:    "bg-green-400",
-};
-
-const AVATAR_COLORS = [
-  "bg-blue-500","bg-violet-500","bg-green-500",
-  "bg-amber-500","bg-rose-500","bg-cyan-500",
-];
-
-// ── page component ────────────────────────────────────────────────────────────
+const AVATAR_COLORS = ["#6366F1","#0EA5E9","#F59E0B","#EF4444","#8B5CF6","#14B8A6"];
 
 export default function DashboardPage() {
   const router = useRouter();
 
-  const [userName,  setUserName]  = useState("");
-  const [userEmail, setUserEmail] = useState("");
+  const [userName,     setUserName]     = useState("");
+  const [userEmail,    setUserEmail]    = useState("");
+  const [profileOpen,  setProfileOpen]  = useState(false);
+  const [dbOk,         setDbOk]         = useState(false);
+  const [stats,        setStats]        = useState({ total: 0, newLeads: 0, activeFollowUps: 0, activeDeals: 0, closed: 0, pipelineValue: 0 });
+  const [recentLeads,  setRecentLeads]  = useState<Lead[]>([]);
+  const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
+  const [allLeads,     setAllLeads]     = useState<Lead[]>([]);
+  const [searchQuery,  setSearchQuery]  = useState("");
+  const [searchOpen,   setSearchOpen]   = useState(false);
 
-  const [dbConnected, setDbConnected] = useState(false);
+  const searchRef  = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
 
-  // Real stats from Supabase
-  const [stats, setStats] = useState({
-    total: 0, newLeads: 0, activeFollowUps: 0,
-    activeDeals: 0, closed: 0, pipelineValue: 0,
-  });
+  const todayStr = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
 
-  // Real recent leads from Supabase
-  const [recentLeads, setRecentLeads] = useState<Lead[]>([]);
-  const [todayTasks, setTodayTasks]   = useState<Task[]>([]);
-  const [clientCount, setClientCount] = useState(0);
-
-  const [allLeads,       setAllLeads]       = useState<Lead[]>([]);
-  const [searchQuery,    setSearchQuery]    = useState("");
-  const [searchOpen,     setSearchOpen]     = useState(false);
-  const searchRef                           = useRef<HTMLDivElement>(null);
-
-  // Notification bell + profile dropdown state
-  const [notifOpen,      setNotifOpen]      = useState(false);
-  const [profileOpen,    setProfileOpen]    = useState(false);
-  const [newsLeads,      setNewsLeads]      = useState<NewspaperLead[]>([]);
-  const [notifSeen,      setNotifSeen]      = useState(false);
-  const notifRef                            = useRef<HTMLDivElement>(null);
-  const profileRef                          = useRef<HTMLDivElement>(null);
-
-  const todayStr = new Date().toLocaleDateString("en-IN", {
-    weekday: "long", day: "numeric", month: "long", year: "numeric",
-  });
-
-  // Load everything when the page opens
   useEffect(() => {
-    loadUser();
-    loadDashboardData();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) { router.replace("/login"); return; }
+      setUserName(user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "");
+      setUserEmail(user.email ?? "");
+    });
+    load();
   }, []);
 
-  async function loadUser() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const name = user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "there";
-      setUserName(name);
-      setUserEmail(user.email ?? "");
-    }
+  async function load() {
+    try {
+      const [leads, s, tasks] = await Promise.all([getAllLeads(), getDashboardStats(), getAllTasks()]);
+      setDbOk(true);
+      setAllLeads(leads);
+      setRecentLeads(leads.slice(0, 8));
+      setStats(s);
+      setPendingTasks(tasks.filter((t) => !t.completed).slice(0, 5));
+    } catch { setDbOk(false); }
   }
 
   async function handleSignOut() {
@@ -97,385 +65,361 @@ export default function DashboardPage() {
     router.push("/login");
   }
 
-  async function loadDashboardData() {
-    try {
-      const leads = await getAllLeads();
-      setDbConnected(true);
-
-      // Calculate stats from real data
-      const s = await getDashboardStats();
-      setStats(s);
-
-      // Show 7 most recent leads
-      setRecentLeads(leads.slice(0, 7));
-
-      // Keep all leads for search
-      setAllLeads(leads);
-
-      // Load real tasks (show only pending, max 5)
-      const tasks = await getAllTasks();
-      setTodayTasks(tasks.filter((t) => !t.completed).slice(0, 5));
-
-      try {
-        const clients = await getAllClients();
-        setClientCount(clients.length);
-      } catch { /* clients table might not exist yet */ }
-
-      // Load latest newspaper leads for the notification bell
-      try {
-        const nl = await getAllNewspaperLeads();
-        setNewsLeads(nl.slice(0, 5));
-      } catch { /* newspaper table might not exist yet */ }
-
-    } catch {
-      setDbConnected(false);
-    }
-  }
-
-  const pendingTasks = todayTasks;
-
-  const overdueLeads = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return allLeads
-      .filter((l) =>
-        l.stage !== "closed" && l.stage !== "lost" &&
-        l.next_follow_up_at && l.next_follow_up_at.slice(0, 10) <= today
-      )
-      .slice(0, 4);
-  }, [allLeads]);
-
-  // Close all dropdowns when clicking outside
+  // Close dropdowns on outside click
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
+    function onDown(e: MouseEvent) {
       if (searchRef.current  && !searchRef.current.contains(e.target as Node))  setSearchOpen(false);
-      if (notifRef.current   && !notifRef.current.contains(e.target as Node))   setNotifOpen(false);
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
     }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
   }, []);
 
-  // Filter leads as user types — match name, phone, or location
-  const searchResults = searchQuery.trim().length > 0
-    ? allLeads.filter((l) => {
-        const q = searchQuery.toLowerCase();
-        return (
-          l.name.toLowerCase().includes(q) ||
-          l.phone.includes(q) ||
-          (l.location ?? "").toLowerCase().includes(q)
-        );
-      }).slice(0, 6) // show max 6 results
-    : [];
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return allLeads.filter((l) =>
+      l.name.toLowerCase().includes(q) ||
+      l.phone.includes(q) ||
+      (l.location ?? "").toLowerCase().includes(q)
+    ).slice(0, 6);
+  }, [searchQuery, allLeads]);
+
+  const overdueLeads = useMemo(() => {
+    const OVERDUE: Partial<Record<LeadStage, number>> = { negotiating: 1, new: 1, viewing: 2, contacted: 4 };
+    const today = new Date().toISOString().slice(0, 10);
+    return allLeads.filter((l) => {
+      if (l.stage === "closed" || l.stage === "lost") return false;
+      if (l.next_follow_up_at && l.next_follow_up_at.slice(0, 10) > today) return false;
+      const days = Math.floor((Date.now() - new Date(l.created_at).getTime()) / 86400000);
+      return days >= (OVERDUE[l.stage] ?? 999);
+    }).slice(0, 5);
+  }, [allLeads]);
 
   return (
-    <div className="p-4 sm:p-6 space-y-5">
+    <div className="flex flex-col h-full">
 
-      {/* ── Top bar ── */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
-          {/* Shows real user name, or "..." while loading */}
-          <p className="text-xs text-gray-400 mt-0.5">
-            Welcome back, <span className="font-medium text-gray-600">{userName || "…"}</span>
-            {" · "}{todayStr}
-          </p>
-        </div>
+      {/* ── Top bar (desktop) ── */}
+      <header className="hidden md:flex items-center gap-4 px-6 py-3 bg-white sticky top-0 z-20" style={{ borderBottom: "1px solid #E5E7EB" }}>
 
-        {/* Search (desktop only) — now actually works! */}
-        <div ref={searchRef} className="hidden sm:block relative flex-1 max-w-xs">
-          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2">
-            <SearchIcon />
+        {/* Search */}
+        <div ref={searchRef} className="relative flex-1 max-w-sm">
+          <div className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: "#F9FAFB", border: "1px solid #E5E7EB" }}>
+            <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
             <input
               type="text"
-              placeholder="Search leads..."
+              placeholder="Search leads, properties..."
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
               onFocus={() => setSearchOpen(true)}
-              className="flex-1 text-sm text-gray-600 placeholder-gray-400 outline-none bg-transparent"
+              className="flex-1 text-sm text-gray-700 placeholder-gray-400 outline-none bg-transparent"
             />
-            {/* Clear button */}
             {searchQuery && (
-              <button onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
-                className="text-gray-300 hover:text-gray-500">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button onClick={() => { setSearchQuery(""); setSearchOpen(false); }} className="text-gray-300 hover:text-gray-500">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             )}
           </div>
-
-          {/* Search results dropdown */}
           {searchOpen && searchResults.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+            <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-xl shadow-lg z-50 overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
               {searchResults.map((lead) => (
-                <Link
-                  key={lead.id}
-                  href={`/leads/${lead.id}`}
+                <Link key={lead.id} href={`/leads/${lead.id}`}
                   onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
-                  className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors"
-                >
+                  className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                    style={{ background: AVATAR_COLORS[lead.name.charCodeAt(0) % AVATAR_COLORS.length] }}>
+                    {initials(lead.name)}
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{lead.name}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">{lead.name}</p>
                     <p className="text-xs text-gray-400 truncate">{lead.phone} · {lead.location}</p>
                   </div>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize shrink-0 ${STAGE_STYLE[lead.stage]}`}>
-                    {lead.stage}
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+                    style={{ background: STAGE_PILL[lead.stage]?.bg, color: STAGE_PILL[lead.stage]?.color }}>
+                    {STAGE_LABEL[lead.stage] ?? lead.stage}
                   </span>
                 </Link>
               ))}
             </div>
           )}
-
-          {/* No results message */}
-          {searchOpen && searchQuery.trim().length > 0 && searchResults.length === 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 px-4 py-3 text-sm text-gray-400">
-              No leads found for &quot;{searchQuery}&quot;
+          {searchOpen && searchQuery.trim() && searchResults.length === 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-xl shadow-lg z-50 px-4 py-3 text-sm text-gray-400" style={{ border: "1px solid #E5E7EB" }}>
+              No results for &quot;{searchQuery}&quot;
             </div>
           )}
         </div>
 
-        {/* Notification bell + profile dropdown */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex-1" />
 
-          {/* ── Bell ── */}
-          <div ref={notifRef} className="relative">
-            <button
-              onClick={() => { setNotifOpen((v) => !v); setProfileOpen(false); setNotifSeen(true); }}
-              className="relative w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
-            >
-              <BellIcon />
-              {newsLeads.length > 0 && !notifSeen && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />
-              )}
-            </button>
+        {/* Quick add */}
+        <Link href="/leads/new"
+          className="flex items-center gap-1.5 px-3.5 py-2 text-white text-sm font-semibold rounded-xl transition-opacity hover:opacity-90"
+          style={{ background: "#1BC47D" }}>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+          Add Lead
+        </Link>
 
-            {notifOpen && (
-              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                  <p className="text-sm font-bold text-gray-900">Lead Sources</p>
-                  <span className="text-[10px] font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
-                    {newsLeads.length} latest
+        {/* Profile */}
+        <div ref={profileRef} className="relative">
+          <button
+            onClick={() => setProfileOpen((v) => !v)}
+            className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl transition-colors hover:bg-gray-50"
+            style={{ border: "1px solid #E5E7EB" }}
+          >
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: "#1BC47D" }}>
+              {userName ? userName.charAt(0).toUpperCase() : "…"}
+            </div>
+            <span className="text-sm font-medium text-gray-700 hidden lg:block">{userName || "…"}</span>
+            <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </button>
+
+          {profileOpen && (
+            <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl z-50 overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
+              <div className="px-4 py-3.5" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                <p className="text-sm font-semibold text-gray-900">{userName}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{userEmail}</p>
+              </div>
+              <div className="py-1">
+                <Link href="/settings" onClick={() => setProfileOpen(false)}
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  Settings
+                </Link>
+              </div>
+              <div className="py-1" style={{ borderTop: "1px solid #F3F4F6" }}>
+                <button onClick={handleSignOut}
+                  className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                  Sign out
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* ── Page body ── */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 sm:pb-6 space-y-5">
+
+        {/* Welcome */}
+        <div>
+          <h1 className="text-xl font-bold" style={{ color: "#111827" }}>
+            Good {getTimeOfDay()}, {userName.split(" ")[0] || "there"} 👋
+          </h1>
+          <p className="text-sm mt-0.5" style={{ color: "#6B7280" }}>{todayStr}</p>
+        </div>
+
+        {/* ── KPI cards ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <KpiCard
+            label="Total Leads"
+            value={dbOk ? stats.total : "—"}
+            sub="All time"
+            icon="👥"
+            color="#1BC47D"
+            href="/leads"
+          />
+          <KpiCard
+            label="Need to Call"
+            value={dbOk ? stats.activeFollowUps : "—"}
+            sub={overdueLeads.length > 0 ? `${overdueLeads.length} overdue` : "All caught up"}
+            subColor={overdueLeads.length > 0 ? "#EF4444" : "#1BC47D"}
+            icon="📞"
+            color="#F59E0B"
+            href="/follow-ups"
+          />
+          <KpiCard
+            label="In Negotiation"
+            value={dbOk ? stats.activeDeals : "—"}
+            sub="Active deals"
+            icon="🤝"
+            color="#8B5CF6"
+            href="/leads"
+          />
+          <KpiCard
+            label="Pipeline Value"
+            value={dbOk ? formatPrice(stats.pipelineValue) : "—"}
+            sub={`~${formatPrice(Math.round(stats.pipelineValue * 0.02))} commission`}
+            icon="💰"
+            color="#1BC47D"
+            href="/deals"
+          />
+        </div>
+
+        {/* ── Main content grid ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+          {/* Recent leads — 2/3 width */}
+          <div className="lg:col-span-2 bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
+            <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: "1px solid #F3F4F6" }}>
+              <h2 className="font-semibold text-sm" style={{ color: "#111827" }}>Recent Leads</h2>
+              <Link href="/leads" className="text-xs font-semibold" style={{ color: "#1BC47D" }}>View all →</Link>
+            </div>
+
+            {/* Desktop table */}
+            {dbOk && recentLeads.length > 0 && (
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid #F3F4F6" }}>
+                      {["Name", "Budget", "Stage", "Source", ""].map((h) => (
+                        <th key={h} className="px-5 py-2.5 text-left" style={{ fontSize: 11, fontWeight: 600, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentLeads.map((lead, i) => {
+                      const pill = STAGE_PILL[lead.stage];
+                      return (
+                        <tr key={lead.id} className="group transition-colors" style={{ borderBottom: "1px solid #F9FAFB" }}
+                          onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.background = "#F9FAFB"}
+                          onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = ""}>
+                          <td className="px-5 py-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0"
+                                style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }}>
+                                {initials(lead.name)}
+                              </div>
+                              <div>
+                                <Link href={`/leads/${lead.id}`} className="text-sm font-semibold text-gray-900 hover:text-[#1BC47D] block">{lead.name}</Link>
+                                <span className="text-xs text-gray-400">{lead.phone}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-5 py-3 text-sm font-medium text-gray-700">{formatPrice(lead.budget_max)}</td>
+                          <td className="px-5 py-3">
+                            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
+                              style={{ background: pill?.bg, color: pill?.color }}>
+                              {STAGE_LABEL[lead.stage] ?? lead.stage}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 text-xs text-gray-400 capitalize">{lead.source}</td>
+                          <td className="px-5 py-3 text-right">
+                            <div className="hidden group-hover:flex items-center justify-end gap-1">
+                              <a href={`tel:${lead.phone}`}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                                style={{ background: "#1BC47D" }}>
+                                Call
+                              </a>
+                              <a href={`https://wa.me/91${lead.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer"
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-white"
+                                style={{ background: "#25D366" }}>
+                                WhatsApp
+                              </a>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Mobile list */}
+            {dbOk && recentLeads.length > 0 && (
+              <div className="sm:hidden divide-y divide-gray-50">
+                {recentLeads.map((lead, i) => {
+                  const pill = STAGE_PILL[lead.stage];
+                  return (
+                    <Link key={lead.id} href={`/leads/${lead.id}`} className="flex items-center gap-3 px-4 py-3 active:bg-gray-50">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                        style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }}>
+                        {initials(lead.name)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{lead.name}</p>
+                        <p className="text-xs text-gray-400 truncate">{lead.phone} · {formatPrice(lead.budget_max)}</p>
+                      </div>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+                        style={{ background: pill?.bg, color: pill?.color }}>
+                        {STAGE_LABEL[lead.stage] ?? lead.stage}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            {dbOk && recentLeads.length === 0 && (
+              <div className="py-14 text-center">
+                <p className="text-gray-400 text-sm">No leads yet.</p>
+                <Link href="/leads/new" className="text-sm font-semibold mt-1 block" style={{ color: "#1BC47D" }}>Add your first lead →</Link>
+              </div>
+            )}
+
+            {!dbOk && (
+              <div className="divide-y divide-gray-50">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-5 py-3.5 animate-pulse">
+                    <div className="w-8 h-8 rounded-full bg-gray-100 shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3 bg-gray-100 rounded w-1/3" />
+                      <div className="h-2.5 bg-gray-50 rounded w-1/2" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Right column */}
+          <div className="flex flex-col gap-4">
+
+            {/* Overdue follow-ups */}
+            {overdueLeads.length > 0 && (
+              <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #FCD34D" }}>
+                <div className="flex items-center gap-2 px-4 py-3" style={{ background: "#FFFBEB", borderBottom: "1px solid #FCD34D" }}>
+                  <span className="text-sm">⚠️</span>
+                  <p className="text-sm font-bold text-amber-800">Call These Now</p>
+                  <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#FCD34D", color: "#92400E" }}>
+                    {overdueLeads.length}
                   </span>
                 </div>
-
-                {newsLeads.length === 0 ? (
-                  <div className="px-4 py-6 text-center text-sm text-gray-400">
-                    No newspaper leads yet
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
-                    {newsLeads.map((lead) => (
-                      <Link
-                        key={lead.id}
-                        href="/newspaper"
-                        onClick={() => setNotifOpen(false)}
-                        className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center shrink-0 mt-0.5">
-                          <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-                          </svg>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 truncate">
-                            {lead.bhk} {lead.property_type} — {lead.area}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            {lead.city} · {formatPrice(lead.price)}
-                            {lead.owner_type === "owner" && (
-                              <span className="ml-1.5 text-purple-600 font-semibold">🔑 Owner</span>
-                            )}
-                          </p>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
-                <div className="px-4 py-2.5 border-t border-gray-100">
-                  <Link
-                    href="/newspaper"
-                    onClick={() => setNotifOpen(false)}
-                    className="text-xs font-semibold text-purple-600 hover:text-purple-700"
-                  >
-                    View all newspaper leads →
-                  </Link>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* ── Profile avatar ── */}
-          <div ref={profileRef} className="relative">
-            <button
-              onClick={() => { setProfileOpen((v) => !v); setNotifOpen(false); }}
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0 transition-colors" style={{ background: '#1BC47D' }}
-            >
-              {userName ? userName.charAt(0).toUpperCase() : "…"}
-            </button>
-
-            {profileOpen && (
-              <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl z-50 overflow-hidden" style={{ border: '1px solid #EEF1F6' }}>
-                {/* User info */}
-                <div className="flex items-center gap-3 px-4 py-3.5" style={{ borderBottom: '1px solid #EEF1F6' }}>
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold shrink-0" style={{ background: '#1BC47D' }}>
-                    {userName ? userName.charAt(0).toUpperCase() : "?"}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{userName}</p>
-                    <p className="text-[11px] text-gray-400 truncate">{userEmail}</p>
-                  </div>
-                </div>
-
-                {/* Menu items */}
-                <div className="py-1">
-                  <Link
-                    href="/settings"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    Settings
-                  </Link>
-
-                  <Link
-                    href="/newspaper"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-                    </svg>
-                    Find Leads
-                  </Link>
-                </div>
-
-                <div className="py-1" style={{ borderTop: '1px solid #EEF1F6' }}>
-                  <button
-                    onClick={handleSignOut}
-                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    Sign out
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-        </div>
-      </div>
-
-
-      {/* ── Stats row ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-
-        <StatCard
-          label="New Leads"
-          value={dbConnected ? stats.newLeads : "—"}
-          accent="blue"
-          trend="↑ today"
-          icon={<LeadStatIcon />}
-          footer={<Link href="/leads/new" className="w-full text-center text-xs font-semibold rounded-lg py-1.5 transition-colors block" style={{ color: '#1BC47D', background: '#F0FDF4' }}>+ New Lead</Link>}
-        />
-
-        <StatCard
-          label="Need to Call"
-          value={dbConnected ? stats.activeFollowUps : "—"}
-          accent="amber"
-          trend={overdueLeads.length > 0 ? `${overdueLeads.length} overdue` : "All caught up"}
-          icon={<FollowUpIcon />}
-          footer={<Link href="/follow-ups" className="text-xs font-semibold text-amber-600 hover:underline">View my calls →</Link>}
-        />
-
-        <StatCard
-          label="In Talks"
-          value={dbConnected ? stats.activeDeals : "—"}
-          accent="violet"
-          trend="Negotiating deals"
-          icon={<DealIcon />}
-          footer={<Link href="/leads" className="text-xs font-semibold text-violet-600 hover:underline">View leads →</Link>}
-        />
-
-        {/* Commission card — always shows (estimated) */}
-        <div className="rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1BC47D, #0fa865)' }}>
-          <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full bg-white/10" />
-          <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-white/10" />
-          <div className="flex items-center justify-between relative">
-            <p className="text-xs font-medium text-white/70">Projected Commission</p>
-            <span className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
-              <CommissionIcon />
-            </span>
-          </div>
-          <div className="relative">
-            <p className="text-2xl font-bold text-white leading-tight">
-              {dbConnected
-                ? formatPrice(Math.round(stats.pipelineValue * 0.02)) // 2% of pipeline
-                : "₹—"}
-            </p>
-            <p className="text-xs text-white/70 mt-1 font-medium">2% of pipeline</p>
-          </div>
-          <div className="flex items-center gap-1.5 relative">
-            <CalendarIcon />
-            <span className="text-xs text-white/70">
-              Pipeline: {dbConnected ? formatPrice(stats.pipelineValue) : "—"}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Today's Actions ── */}
-      {dbConnected && (overdueLeads.length > 0 || pendingTasks.length > 0) && (
-        <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #EEF1F6" }}>
-          <div className="flex items-center gap-2 px-5 py-3" style={{ borderBottom: "1px solid #EEF1F6" }}>
-            <svg className="w-4 h-4" fill="none" stroke="#F59E0B" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-            <h2 className="font-semibold text-sm" style={{ color: "#1A1D23" }}>{"Today's Actions"}</h2>
-            <span className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "#FEF3C7", color: "#D97706" }}>
-              {overdueLeads.length + pendingTasks.length} items
-            </span>
-          </div>
-          <div className="grid sm:grid-cols-2" style={{ borderBottom: "1px solid #EEF1F6" }}>
-            {/* Overdue follow-ups */}
-            <div className="p-4" style={{ borderRight: "1px solid #EEF1F6" }}>
-              <p className="text-xs font-semibold mb-3" style={{ color: "#D97706" }}>
-                Call These Now{overdueLeads.length > 0 ? ` (${overdueLeads.length})` : ""}
-              </p>
-              {overdueLeads.length === 0 ? (
-                <p className="text-xs text-gray-400">All caught up!</p>
-              ) : (
-                <div className="space-y-2.5">
-                  {overdueLeads.map((l) => (
-                    <Link key={l.id} href={`/leads/${l.id}`} className="flex items-center gap-2.5 group">
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-white text-[10px] font-bold" style={{ background: "#F59E0B" }}>
-                        {l.name.charAt(0).toUpperCase()}
+                <div className="divide-y divide-amber-50">
+                  {overdueLeads.map((lead) => (
+                    <Link key={lead.id} href={`/leads/${lead.id}`}
+                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-amber-50 transition-colors active:bg-amber-100">
+                      <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 text-[10px] font-bold shrink-0">
+                        {initials(lead.name)}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-gray-900 truncate group-hover:text-amber-600 transition-colors">{l.name}</p>
-                        <p className="text-[10px] text-gray-400 truncate">{l.phone}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{lead.name}</p>
+                        <p className="text-xs text-gray-400 truncate">{lead.phone}</p>
                       </div>
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: "#FEF3C7", color: "#D97706" }}>{STAGE_LABEL[l.stage] ?? l.stage}</span>
+                      <a href={`tel:${lead.phone}`} onClick={(e) => e.stopPropagation()}
+                        className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white"
+                        style={{ background: "#1BC47D" }}>
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                      </a>
                     </Link>
                   ))}
                 </div>
-              )}
-            </div>
+                <div className="px-4 py-2.5" style={{ borderTop: "1px solid #FCD34D" }}>
+                  <Link href="/follow-ups" className="text-xs font-semibold text-amber-700">Go to My Calls →</Link>
+                </div>
+              </div>
+            )}
+
             {/* Pending tasks */}
-            <div className="p-4">
-              <p className="text-xs font-semibold mb-3" style={{ color: "#1BC47D" }}>
-                Pending Tasks{pendingTasks.length > 0 ? ` (${pendingTasks.length})` : ""}
-              </p>
+            <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
+              <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                <p className="text-sm font-semibold text-gray-800">Pending Tasks</p>
+                <Link href="/tasks" className="text-xs font-semibold" style={{ color: "#1BC47D" }}>All →</Link>
+              </div>
               {pendingTasks.length === 0 ? (
-                <p className="text-xs text-gray-400">No pending tasks.</p>
+                <div className="px-4 py-6 text-center text-sm text-gray-400">No pending tasks 🎉</div>
               ) : (
-                <div className="space-y-2.5">
-                  {pendingTasks.slice(0, 4).map((t) => (
-                    <Link key={t.id} href="/tasks" className="flex items-center gap-2.5 group">
-                      <div className={`w-2 h-2 rounded-full shrink-0 mt-0.5 ${t.priority === "high" ? "bg-red-500" : t.priority === "medium" ? "bg-amber-400" : "bg-green-400"}`} />
-                      <p className="text-xs font-medium text-gray-700 truncate flex-1 group-hover:text-green-600 transition-colors">{t.type} · {t.lead_name}</p>
+                <div className="divide-y divide-gray-50">
+                  {pendingTasks.map((t) => (
+                    <Link key={t.id} href="/tasks" className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${t.priority === "high" ? "bg-red-500" : t.priority === "medium" ? "bg-amber-400" : "bg-green-400"}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{t.lead_name}</p>
+                        <p className="text-xs text-gray-400 truncate">{t.type}</p>
+                      </div>
                       {t.due_date && (
                         <span className="text-[10px] text-gray-400 shrink-0">
                           {new Date(t.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
@@ -486,226 +430,64 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* ── Main content: Leads + Tasks ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-        {/* Leads Pipeline */}
-        <div className="lg:col-span-2 bg-white rounded-2xl overflow-hidden" style={{ border: '1px solid #EEF1F6' }}>
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #EEF1F6' }}>
-            <h2 className="font-semibold text-sm" style={{ color: '#1A1D23' }}>My Leads</h2>
-            <Link href="/leads/new" className="flex items-center gap-1.5 px-3 py-1.5 text-white text-xs font-semibold rounded-lg transition-colors" style={{ background: '#1BC47D' }}>
-              <PlusIcon /> Add Lead
-            </Link>
-          </div>
-
-          {/* Loading skeleton */}
-          {!dbConnected && recentLeads.length === 0 && (
-            <div className="divide-y divide-gray-50">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-5 py-4 animate-pulse">
-                  <div className="w-8 h-8 rounded-full bg-gray-200 shrink-0" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3 bg-gray-200 rounded w-1/3" />
-                    <div className="h-2.5 bg-gray-100 rounded w-1/2" />
-                  </div>
-                  <div className="h-5 bg-gray-200 rounded-full w-16" />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Empty state */}
-          {dbConnected && recentLeads.length === 0 && (
-            <div className="py-12 text-center text-gray-400 text-sm">
-              No leads yet.{" "}
-              <Link href="/leads/new" className="hover:underline" style={{ color: '#1BC47D' }}>Add your first lead →</Link>
-            </div>
-          )}
-
-          {/* Desktop table */}
-          {dbConnected && recentLeads.length > 0 && (
-            <>
-              <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid #F0F3F8' }}>
-                      <th className="px-5 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">Name</th>
-                      <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">Deal Value</th>
-                      <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">Stage</th>
-                      <th className="px-4 py-3"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#F0F3F8]">
-                    {recentLeads.map((lead, i) => (
-                      <tr key={lead.id} className="hover:bg-[#F8F9FB] transition-colors">
-                        <td className="px-5 py-3">
-                          <div className="flex items-center gap-2.5">
-                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
-                              {initials(lead.name)}
-                            </div>
-                            <div>
-                              <Link href={`/leads/${lead.id}`} className="text-xs font-semibold text-gray-900 hover:text-[#1BC47D] block">{lead.name}</Link>
-                              <span className="text-[10px] text-gray-400">{lead.phone}</span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-xs font-semibold text-gray-700">{formatPrice(lead.budget_max)}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${STAGE_STYLE[lead.stage]}`}>{STAGE_LABEL[lead.stage] ?? lead.stage}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Link href={`/leads/${lead.id}`} className="w-6 h-6 inline-flex items-center justify-center rounded-lg hover:bg-[#F0FDF4] text-gray-400 hover:text-[#1BC47D] transition-colors">
-                            <ChevronIcon />
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile card list */}
-              <div className="sm:hidden divide-y divide-[#F0F3F8]">
-                {recentLeads.map((lead, i) => (
-                  <Link key={lead.id} href={`/leads/${lead.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-[#F8F9FB] transition-colors">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
-                      {initials(lead.name)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{lead.name}</p>
-                      <p className="text-xs text-gray-400 truncate">{lead.phone} · {formatPrice(lead.budget_max)}</p>
-                    </div>
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold capitalize shrink-0 ${STAGE_STYLE[lead.stage]}`}>{lead.stage}</span>
+            {/* Quick actions */}
+            <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
+              <p className="px-4 py-3 text-sm font-semibold text-gray-800" style={{ borderBottom: "1px solid #F3F4F6" }}>Quick Actions</p>
+              <div className="divide-y divide-gray-50">
+                {[
+                  { label: "Add New Lead",        href: "/leads/new",           icon: "👤" },
+                  { label: "Add Property",         href: "/properties/new",      icon: "🏢" },
+                  { label: "Schedule Site Visit",  href: "/visits",              icon: "📅" },
+                  { label: "Create Property Link", href: "/secure-share/create", icon: "🔗" },
+                  { label: "Log Commission",       href: "/deals",               icon: "💰" },
+                ].map(({ label, href, icon }) => (
+                  <Link key={href} href={href}
+                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors group">
+                    <span className="text-base shrink-0">{icon}</span>
+                    <span className="text-sm font-medium text-gray-700 flex-1">{label}</span>
+                    <svg className="w-3.5 h-3.5 text-gray-300 group-hover:text-[#1BC47D] transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                   </Link>
                 ))}
               </div>
-            </>
-          )}
-
-          <div className="px-5 py-3" style={{ borderTop: '1px solid #F0F3F8' }}>
-            <Link href="/leads" className="text-xs font-medium hover:underline" style={{ color: '#1BC47D' }}>View all leads →</Link>
-          </div>
-        </div>
-
-        {/* Stats + Quick Links */}
-        <div className="bg-white rounded-2xl overflow-hidden flex flex-col" style={{ border: '1px solid #EEF1F6' }}>
-          {/* Mini stats */}
-          <div className="grid grid-cols-3 divide-x" style={{ borderBottom: '1px solid #EEF1F6', borderColor: '#EEF1F6' }}>
-            <div className="px-3 py-3 text-center">
-              <p className="text-xl font-bold text-gray-900">{dbConnected ? stats.total : "—"}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Leads</p>
-            </div>
-            <div className="px-3 py-3 text-center">
-              <p className="text-xl font-bold text-gray-900">{dbConnected ? clientCount : "—"}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Clients</p>
-            </div>
-            <div className="px-3 py-3 text-center">
-              <p className="text-base font-bold text-gray-900 leading-tight">{dbConnected ? formatPrice(stats.pipelineValue) : "—"}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Pipeline</p>
-            </div>
-          </div>
-
-          {/* Quick Links */}
-          <div className="px-4 py-4 flex-1">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Quick Actions</p>
-            <div className="space-y-0.5">
-              {[
-                { label: "Add New Lead",       href: "/leads/new",           color: "#1BC47D" },
-                { label: "Add Property",       href: "/properties/new",      color: "#1BC47D" },
-                { label: "Create Share Link",  href: "/secure-share/create", color: "#6366F1" },
-                { label: "Log a Call",         href: "/follow-ups",          color: "#F59E0B" },
-                { label: "View Analytics",     href: "/analytics",           color: "#6B7280" },
-              ].map(({ label, href, color }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-[#F5F7FA] transition-colors group"
-                >
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{label}</span>
-                  <svg className="w-3.5 h-3.5 opacity-50 group-hover:opacity-100 transition-opacity" style={{ color }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
-              ))}
             </div>
           </div>
         </div>
       </div>
-
     </div>
   );
 }
 
-// ── Small reusable stat card ──────────────────────────────────────────────────
+// ── KPI Card ──────────────────────────────────────────────────────────────────
 
-function StatCard({
-  label, value, accent, trend, icon, footer,
+function KpiCard({
+  label, value, sub, subColor = "#6B7280", icon, color, href,
 }: {
-  label: string;
-  value: number | string;
-  accent: string;
-  trend: string;
-  icon: React.ReactNode;
-  footer: React.ReactNode;
+  label: string; value: number | string; sub: string; subColor?: string;
+  icon: string; color: string; href: string;
 }) {
-  const accentBg: Record<string, string> = {
-    blue: "bg-[#F0FDF4]", amber: "bg-amber-50", violet: "bg-violet-50",
-  };
-  const trendColor: Record<string, string> = {
-    blue: "text-[#1BC47D]", amber: "text-green-500", violet: "text-gray-400",
-  };
   return (
-    <div className="bg-white rounded-2xl p-4 flex flex-col gap-3" style={{ border: '1px solid #EEF1F6' }}>
+    <Link href={href} className="bg-white rounded-2xl p-4 flex flex-col gap-2 group transition-shadow hover:shadow-md active:scale-[0.99]" style={{ border: "1px solid #E5E7EB" }}>
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-gray-500">{label}</p>
-        <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${accentBg[accent]}`}>
-          {icon}
-        </span>
+        <span className="text-xl">{icon}</span>
+        <svg className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
       </div>
       <div>
-        <p className="text-3xl font-bold text-gray-900">{value}</p>
-        <p className={`text-xs mt-1 font-medium ${trendColor[accent]}`}>{trend}</p>
+        <p className="text-2xl font-bold" style={{ color: "#111827" }}>{value}</p>
+        <p className="text-xs font-medium mt-0.5" style={{ color: "#9CA3AF" }}>{label}</p>
       </div>
-      {footer}
-    </div>
+      <p className="text-xs font-semibold" style={{ color: subColor }}>{sub}</p>
+    </Link>
   );
 }
 
-function TaskItem({ task, index }: { task: Task; index: number }) {
-  const PRIORITY_DOT: Record<TaskPriority, string> = {
-    high: "bg-red-500", medium: "bg-amber-400", low: "bg-green-400",
-  };
-  const colors = ["bg-blue-500","bg-violet-500","bg-green-500","bg-amber-500","bg-rose-500"];
-  return (
-    <div className={`flex items-center gap-3 px-4 py-3 ${task.completed ? "opacity-50" : ""}`}>
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 ${colors[index % colors.length]}`}>
-        {initials(task.lead_name)}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className={`text-xs font-semibold text-gray-900 truncate ${task.completed ? "line-through" : ""}`}>{task.lead_name}</p>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <span className="text-[10px] text-gray-500">{task.type}</span>
-          <span className="text-gray-200">·</span>
-          <span className="text-[10px] text-gray-400">{task.lead_phone}</span>
-        </div>
-      </div>
-      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${PRIORITY_DOT[task.priority]}`} />
-    </div>
-  );
+function getTimeOfDay() {
+  const h = new Date().getHours();
+  if (h < 12) return "morning";
+  if (h < 17) return "afternoon";
+  return "evening";
 }
-
-// ── Icons ─────────────────────────────────────────────────────────────────────
-
-function SearchIcon() { return <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>; }
-function BellIcon()   { return <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>; }
-function LeadStatIcon(){ return <svg className="w-4 h-4" style={{ color: '#1BC47D' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>; }
-function FollowUpIcon(){ return <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>; }
-function DealIcon()   { return <svg className="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>; }
-function CommissionIcon(){ return <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>; }
-function CalendarIcon(){ return <svg className="w-3 h-3 text-blue-200 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>; }
-function PlusIcon()   { return <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>; }
-function ChevronIcon(){ return <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>; }
