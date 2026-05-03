@@ -11,7 +11,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { addLead } from "@/lib/db/leads";
+import { addLead, getAllLeads } from "@/lib/db/leads";
 import { supabase } from "@/lib/supabase";
 import { Lead, LeadSource, LeadStage } from "@/lib/types";
 
@@ -19,6 +19,7 @@ export default function NewLeadPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [duplicate, setDuplicate] = useState<{ id: string; name: string; phone: string } | null>(null);
 
   // One state object holding ALL form fields
   // This is cleaner than having 9 separate useState calls
@@ -35,10 +36,19 @@ export default function NewLeadPage() {
     notes:             "",
   });
 
-  // Helper: updates ONE field in the form without touching others
-  // e.g. set("name", "Rahul") → only changes form.name
   function set(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
+    if (field === "phone") setDuplicate(null);
+  }
+
+  async function checkDuplicate(phone: string) {
+    if (phone.replace(/\D/g, "").length < 7) return;
+    try {
+      const leads = await getAllLeads();
+      const norm = phone.replace(/\D/g, "");
+      const match = leads.find((l) => l.phone.replace(/\D/g, "") === norm);
+      setDuplicate(match ? { id: match.id, name: match.name, phone: match.phone } : null);
+    } catch {}
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -97,6 +107,23 @@ export default function NewLeadPage() {
         </div>
       </div>
 
+      {/* Duplicate warning */}
+      {duplicate && (
+        <div className="mb-4 p-4 rounded-xl border border-amber-200 bg-amber-50 flex items-start gap-3">
+          <span className="text-xl shrink-0">⚠️</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800">Possible Duplicate</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              A lead with this phone already exists: <strong>{duplicate.name}</strong>
+            </p>
+          </div>
+          <Link href={`/leads/${duplicate.id}`}
+            className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-700 text-white hover:bg-amber-800 transition-colors">
+            View Lead
+          </Link>
+        </div>
+      )}
+
       {/* Form card */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -110,7 +137,9 @@ export default function NewLeadPage() {
             </Field>
             <Field label="Phone *">
               <input required type="tel" placeholder="+91 98765 43210"
-                value={form.phone} onChange={(e) => set("phone", e.target.value)}
+                value={form.phone}
+                onChange={(e) => set("phone", e.target.value)}
+                onBlur={(e) => checkDuplicate(e.target.value)}
                 className={input} />
             </Field>
           </div>
