@@ -9,6 +9,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin }             from "@/lib/supabase-admin";
 import { parseInboundEmail }         from "@/lib/email-parser";
 import type { LeadSource, PropertyInterest } from "@/lib/types";
+import { PLANS, AUTO_CAPTURE_LIMIT } from "@/lib/plans";
+import type { Plan } from "@/lib/plans";
 
 // Gmail search query — portals + direct buyer emails
 const GMAIL_QUERY = [
@@ -179,6 +181,34 @@ async function processConnection(conn: {
           .from("leads").select("id")
           .eq("user_id", userId).eq("email", parsed.email).maybeSingle();
         if (dup) { stats.skipped++; continue; }
+      }
+
+      // Check plan limits before inserting
+      const { data: sub } = await supabaseAdmin
+        .from("subscriptions")
+        .select("plan, status, expires_at")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      const plan        = (sub?.status === "active" && (!sub.expires_at || new Date(sub.expires_at) > new Date()) ? sub.plan : "free") as Plan;
+      const leadLimit   = PLANS[plan].leads;
+      const captureLimit = AUTO_CAPTURE_LIMIT[plan];
+
+      const { count: totalLeads } = await supabaseAdmin
+        .from("leads").select("id", { count: "exact", head: true })
+        .eq("user_id", userId);
+
+      if (leadLimit !== Infinity && (totalLeads ?? 0) >= leadLimit) {
+        stats.skipped++;
+        continue;
+      }
+
+      // Auto-capture limit: count only auto-captured leads (source != manual)
+      if (captureLimit !== Infinity) {
+        const { count: autoLeads } = await supabaseAdmin
+          .from("leads").select("id", { count: "exact", head: true })
+          .eq("user_id", userId).neq("source", "manual");
+        if ((autoLeads ?? 0) >= captureLimit) { stats.skipped++; continue; }
       }
 
       // Insert lead

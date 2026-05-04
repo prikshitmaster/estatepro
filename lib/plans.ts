@@ -1,10 +1,16 @@
 export type Plan = "free" | "starter" | "pro";
 
+export const AUTO_CAPTURE_LIMIT: Record<Plan, number> = {
+  free:    20,
+  starter: 500,
+  pro:     Infinity,
+};
+
 export const PLANS = {
   free: {
     name:       "Free",
     price:      0,
-    leads:      25,
+    leads:      2,   // TESTING — change to 25 before launch
     properties: 10,
     team:       1,
   },
