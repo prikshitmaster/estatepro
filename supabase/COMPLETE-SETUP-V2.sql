@@ -197,9 +197,60 @@ CREATE POLICY "gmail_connections_own" ON gmail_connections USING (auth.uid() = u
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS next_follow_up_at timestamptz;
 
 
+-- ── 10. SUBSCRIPTIONS ────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id      uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
+  plan         text NOT NULL DEFAULT 'free',    -- free | starter | pro
+  status       text NOT NULL DEFAULT 'active',  -- active | expired | cancelled
+  razorpay_id  text,                            -- Razorpay payment/order ID
+  started_at   timestamptz DEFAULT now(),
+  expires_at   timestamptz,                     -- NULL = free (never expires)
+  created_at   timestamptz DEFAULT now(),
+  updated_at   timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS subscriptions_user_id_idx ON subscriptions(user_id);
+
+ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "subscriptions_own" ON subscriptions;
+CREATE POLICY "subscriptions_own" ON subscriptions USING (auth.uid() = user_id);
+
+-- Allow service role (API) to insert/update subscriptions
+DROP POLICY IF EXISTS "subscriptions_service_write" ON subscriptions;
+CREATE POLICY "subscriptions_service_write" ON subscriptions
+  USING (true)
+  WITH CHECK (true);
+
+-- Auto-assign free plan when a new user signs up
+CREATE OR REPLACE FUNCTION handle_new_user_subscription()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.subscriptions (user_id, plan, status)
+  VALUES (NEW.id, 'free', 'active')
+  ON CONFLICT (user_id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created_subscription ON auth.users;
+CREATE TRIGGER on_auth_user_created_subscription
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user_subscription();
+
+-- Backfill: give existing users a free plan if they don't have one yet
+INSERT INTO subscriptions (user_id, plan, status)
+SELECT id, 'free', 'active'
+FROM auth.users
+WHERE id NOT IN (SELECT user_id FROM subscriptions)
+ON CONFLICT (user_id) DO NOTHING;
+
+
 -- ── DONE ──────────────────────────────────────────────────────────────────────
 -- All tables created. RLS enabled on all tables.
 -- You can now use: tags, activity_logs, notifications, smart_lists,
 --                  whatsapp_connections, whatsapp_templates, user_inboxes,
---                  gmail_connections
+--                  gmail_connections, subscriptions
 -- ─────────────────────────────────────────────────────────────────────────────

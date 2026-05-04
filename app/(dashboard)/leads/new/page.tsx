@@ -8,18 +8,36 @@
 //    - We redirect to /leads to see the new lead in the list
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { addLead, getAllLeads } from "@/lib/db/leads";
 import { supabase } from "@/lib/supabase";
 import { Lead, LeadSource, LeadStage } from "@/lib/types";
+import { getUserPlan } from "@/lib/db/subscriptions";
+import { PLANS, isOverLimit } from "@/lib/plans";
+import type { Plan } from "@/lib/plans";
+import UpgradeModal from "@/app/_components/UpgradeModal";
 
 export default function NewLeadPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [saveError, setSaveError] = useState("");
-  const [duplicate, setDuplicate] = useState<{ id: string; name: string; phone: string } | null>(null);
+  const [loading,      setLoading]      = useState(false);
+  const [saveError,    setSaveError]    = useState("");
+  const [duplicate,    setDuplicate]    = useState<{ id: string; name: string; phone: string } | null>(null);
+  const [userPlan,     setUserPlan]     = useState<Plan>("free");
+  const [leadCount,    setLeadCount]    = useState(0);
+  const [showUpgrade,  setShowUpgrade]  = useState(false);
+  const [limitChecked, setLimitChecked] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const [plan, leads] = await Promise.all([getUserPlan(), getAllLeads()]);
+      setUserPlan(plan);
+      setLeadCount(leads.length);
+      if (isOverLimit(plan, "leads", leads.length)) setShowUpgrade(true);
+      setLimitChecked(true);
+    })();
+  }, []);
 
   // One state object holding ALL form fields
   // This is cleaner than having 9 separate useState calls
@@ -54,15 +72,19 @@ export default function NewLeadPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaveError("");
+
+    // Hard limit check before saving
+    if (isOverLimit(userPlan, "leads", leadCount)) {
+      setShowUpgrade(true);
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Get the currently logged-in user from Supabase
-      // We need user_id to know WHOSE lead this is
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        // Not logged in — redirect to login
         router.push("/login");
         return;
       }
@@ -93,8 +115,22 @@ export default function NewLeadPage() {
     }
   }
 
+  const limit = PLANS[userPlan].leads;
+  const pct   = limit === Infinity ? 0 : Math.min((leadCount / limit) * 100, 100);
+  const nearLimit = limit !== Infinity && leadCount >= limit * 0.8;
+
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto pb-24 sm:pb-6">
+
+      {/* Upgrade modal */}
+      {showUpgrade && (
+        <UpgradeModal
+          currentPlan={userPlan}
+          resource="leads"
+          onClose={() => setShowUpgrade(false)}
+          onUpgrade={(_plan) => { setShowUpgrade(false); router.push("/settings/billing"); }}
+        />
+      )}
 
       {/* Header with back button */}
       <div className="flex items-center gap-3 mb-6">
@@ -106,6 +142,27 @@ export default function NewLeadPage() {
           <p className="text-gray-400 text-sm">Fill in the lead&apos;s details below</p>
         </div>
       </div>
+
+      {/* Plan usage bar — shown when near or at limit */}
+      {limitChecked && limit !== Infinity && (
+        <div className={`mb-4 p-3.5 rounded-xl border ${nearLimit ? "border-amber-200 bg-amber-50" : "border-gray-100 bg-gray-50"}`}>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-semibold text-gray-600">
+              Leads used: {leadCount} / {limit}
+            </span>
+            {nearLimit && (
+              <button onClick={() => setShowUpgrade(true)}
+                className="text-xs font-semibold text-amber-700 hover:underline">
+                Upgrade →
+              </button>
+            )}
+          </div>
+          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full rounded-full transition-all"
+              style={{ width: `${pct}%`, background: pct >= 100 ? "#EF4444" : pct >= 80 ? "#F59E0B" : "#1BC47D" }} />
+          </div>
+        </div>
+      )}
 
       {/* Duplicate warning */}
       {duplicate && (
