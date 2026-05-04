@@ -5,6 +5,17 @@
 -- ============================================================
 
 -- ── 1. TAGS ──────────────────────────────────────────────────────────────────
+-- If tags was previously created with a different schema (missing user_id),
+-- patch it before CREATE TABLE IF NOT EXISTS runs (which would silently skip).
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tags') THEN
+    ALTER TABLE tags ADD COLUMN IF NOT EXISTS user_id    uuid REFERENCES auth.users(id) ON DELETE CASCADE;
+    ALTER TABLE tags ADD COLUMN IF NOT EXISTS name       text;
+    ALTER TABLE tags ADD COLUMN IF NOT EXISTS color      text DEFAULT '#6366F1';
+    ALTER TABLE tags ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS tags (
   id         uuid DEFAULT gen_random_uuid() PRIMARY KEY,

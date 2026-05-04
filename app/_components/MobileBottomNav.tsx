@@ -6,14 +6,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const mainTabs = [
-  { label: "Home",     href: "/dashboard",  icon: HomeIcon   },
-  { label: "Leads",    href: "/leads",      icon: UsersIcon  },
-  { label: "My Calls", href: "/follow-ups", icon: PhoneIcon  },
-  { label: "Tasks",    href: "/tasks",      icon: TasksIcon  },
+  { label: "Home",       href: "/dashboard",    icon: HomeIcon    },
+  { label: "Leads",      href: "/leads",        icon: UsersIcon   },
+  { label: "Tasks",      href: "/tasks",        icon: TasksIcon   },
+  { label: "Properties", href: "/properties",   icon: BuildingIcon},
 ];
 
 const moreItems = [
-  { label: "Properties",       href: "/properties",   icon: BuildingIcon  },
   { label: "Auto Capture",     href: "/auto-capture", icon: CaptureIcon   },
   { label: "Action Plans",     href: "/action-plans", icon: ActionPlanIcon},
   { label: "Site Visits",      href: "/visits",       icon: CalendarIcon  },

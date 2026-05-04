@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { getAllLeads, updateLead, deleteLead } from "@/lib/db/leads";
 import { formatPrice, initials, STAGE_LABEL } from "@/lib/mock-data";
 import { Lead, LeadStage } from "@/lib/types";
+import { supabase } from "@/lib/supabase";
 
 // ── Scoring ────────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,26 @@ function autoSource(notes: string | null) {
 
 const AVATAR_COLORS = ["#6366F1","#0EA5E9","#F59E0B","#EF4444","#8B5CF6","#14B8A6","#EC4899","#10B981"];
 
+function timeAgo(iso: string): { text: string; color: string } {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins  = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days  = Math.floor(diff / 86400000);
+  const text =
+    mins < 2   ? "Just now" :
+    mins < 60  ? `${mins}m ago` :
+    hours < 24 ? `${hours}h ago` :
+    days === 1 ? "Yesterday" :
+    days < 30  ? `${days}d ago` :
+    new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const color =
+    days >= 7  ? "#EF4444" :   // red — stale, needs attention
+    days >= 3  ? "#F97316" :   // orange — getting stale
+    days >= 1  ? "#F59E0B" :   // amber — touched recently
+                 "#1BC47D";    // green — active today
+  return { text, color };
+}
+
 type SortKey = "name" | "budget" | "stage" | "created";
 type SortDir = "asc" | "desc";
 
@@ -125,16 +146,57 @@ export default function LeadsPage() {
   const [selected,    setSelected]    = useState<Set<string>>(new Set());
   const [bulkPop,     setBulkPop]     = useState(false);
   const [bulkDel,     setBulkDel]     = useState(false);
-  const [page,        setPage]        = useState(1);
+  const [page,         setPage]         = useState(1);
+  const [lastActivity, setLastActivity] = useState<Map<string, string>>(new Map());
+  const [tick,         setTick]         = useState(0); // forces timeAgo to recalculate
   const PAGE_SIZE = 25;
+  const leadsRef = useRef<Lead[]>([]);
+
+  async function fetchActivity(leadList: Lead[]) {
+    if (leadList.length === 0) return;
+    try {
+      const { data: acts } = await supabase
+        .from("activity_logs")
+        .select("lead_id, created_at")
+        .in("lead_id", leadList.map((l) => l.id))
+        .order("created_at", { ascending: false });
+      if (!acts) return;
+      const map = new Map<string, string>();
+      for (const act of acts) {
+        if (!map.has(act.lead_id)) map.set(act.lead_id, act.created_at);
+      }
+      setLastActivity(map);
+    } catch {}
+  }
 
   useEffect(() => {
-    getAllLeads().then(setLeads).catch(() => {}).finally(() => setLoading(false));
+    getAllLeads().then((data) => {
+      setLeads(data);
+      leadsRef.current = data;
+      fetchActivity(data);
+    }).catch(() => {}).finally(() => setLoading(false));
+
+    // Refetch activity whenever user comes back to this tab/page
+    function onVisible() {
+      if (document.visibilityState === "visible") {
+        fetchActivity(leadsRef.current);
+      }
+    }
+    document.addEventListener("visibilitychange", onVisible);
+
+    // Keep timeAgo text live — recalculate every 60 seconds
+    const ticker = setInterval(() => setTick((t) => t + 1), 60_000);
+
     // Close stage pop on outside click
     function onDown() { setStagePop(null); }
     document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, []);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      document.removeEventListener("mousedown", onDown);
+      clearInterval(ticker);
+    };
+  }, []); // eslint-disable-line
 
   const handleStageChange = useCallback(async (id: string, s: LeadStage) => {
     setStagePop(null);
@@ -502,7 +564,7 @@ export default function LeadsPage() {
               ))}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <div className="flex flex-col items-center justify-center py-20 gap-3" data-tick={tick}>
               <span className="text-4xl">🔍</span>
               <p className="text-gray-500 font-medium">No leads found</p>
               <p className="text-gray-400 text-sm">Try adjusting your filters</p>
@@ -525,11 +587,11 @@ export default function LeadsPage() {
                   <SortTh label="Stage" sortKey="stage" current={sortKey} dir={sortDir} onSort={toggleSort} />
                   <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Source</th>
                   <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Quality</th>
-                  <SortTh label="Added" sortKey="created" current={sortKey} dir={sortDir} onSort={toggleSort} />
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Last Activity</th>
                   <th className="px-4 py-3 w-28" />
                 </tr>
               </thead>
-              <tbody>
+              <tbody data-tick={tick}>
                 {paginated.map((lead, i) => {
                   const q      = quality(score(lead));
                   const pill   = STAGE_PILL[lead.stage];
@@ -632,9 +694,27 @@ export default function LeadsPage() {
                         </span>
                       </td>
 
-                      {/* Added date */}
-                      <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
-                        {new Date(lead.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                      {/* Last activity */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {(() => {
+                          const lastAt = lastActivity.get(lead.id);
+                          if (lastAt) {
+                            const { text, color } = timeAgo(lastAt);
+                            return (
+                              <div>
+                                <p className="text-xs font-semibold" style={{ color }}>{text}</p>
+                                <p className="text-[10px] text-gray-400">last activity</p>
+                              </div>
+                            );
+                          }
+                          const { text } = timeAgo(lead.created_at);
+                          return (
+                            <div>
+                              <p className="text-xs text-gray-400">{text}</p>
+                              <p className="text-[10px] text-gray-300">added · no activity</p>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Actions — show on row hover */}
@@ -687,9 +767,11 @@ export default function LeadsPage() {
           )}
 
           {!loading && paginated.map((lead, i) => {
-            const q    = quality(score(lead));
-            const pill = STAGE_PILL[lead.stage];
-            const src  = autoSource(lead.notes ?? "");
+            const q      = quality(score(lead));
+            const pill   = STAGE_PILL[lead.stage];
+            const src    = autoSource(lead.notes ?? "");
+            const lastAt = lastActivity.get(lead.id);
+            const act    = lastAt ? timeAgo(lastAt) : null;
             return (
               <Link key={lead.id} href={`/leads/${lead.id}`}
                 className="flex items-center gap-3 px-4 py-3.5 active:bg-gray-50 bg-white">
@@ -717,10 +799,16 @@ export default function LeadsPage() {
                     style={{ background: pill.bg, color: pill.text }}>
                     {STAGE_LABEL[lead.stage] ?? lead.stage}
                   </span>
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                    style={{ background: Q_PILL[q].bg, color: Q_PILL[q].text }}>
-                    {Q_PILL[q].label}
-                  </span>
+                  {act ? (
+                    <span className="text-[10px] font-semibold" style={{ color: act.color }}>
+                      {act.text}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                      style={{ background: Q_PILL[q].bg, color: Q_PILL[q].text }}>
+                      {Q_PILL[q].label}
+                    </span>
+                  )}
                 </div>
               </Link>
             );

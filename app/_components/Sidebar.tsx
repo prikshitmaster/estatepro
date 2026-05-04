@@ -6,16 +6,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getAllLeads } from "@/lib/db/leads";
-import { getFollowUpLogs } from "@/lib/db/follow-ups";
-
 // ── Nav structure ─────────────────────────────────────────────────────────────
 
 const coreItems = [
   { label: "Dashboard",       href: "/dashboard",    icon: DashboardIcon  },
   { label: "Leads",           href: "/leads",        icon: LeadsIcon      },
-  { label: "My Calls",        href: "/follow-ups",   icon: PhoneIcon      },
   { label: "Tasks",           href: "/tasks",        icon: TasksIcon      },
-  { label: "Auto Capture ⚡", href: "/auto-capture", icon: CaptureIcon    },
+  { label: "Auto Capture",    href: "/auto-capture", icon: CaptureIcon    },
 ];
 
 const toolItems = [
@@ -54,15 +51,13 @@ export default function Sidebar() {
       setUserEmail(user.email ?? "");
 
       const OVERDUE: Partial<Record<string, number>> = { negotiating: 1, new: 1, viewing: 2, contacted: 4 };
-      Promise.all([getAllLeads(), getFollowUpLogs(user.id)]).then(([leads, logs]) => {
-        const lastLog: Record<string, string> = {};
-        logs.forEach((l) => { if (!lastLog[l.lead_id]) lastLog[l.lead_id] = l.created_at; });
+      getAllLeads().then((leads) => {
         const today = new Date().toISOString().slice(0, 10);
         let n = 0;
         leads.forEach((lead) => {
           if (lead.stage === "closed" || lead.stage === "lost") return;
           if (lead.next_follow_up_at && lead.next_follow_up_at.slice(0, 10) > today) return;
-          const days = Math.floor((Date.now() - new Date(lastLog[lead.id] ?? lead.created_at).getTime()) / 86400000);
+          const days = Math.floor((Date.now() - new Date(lead.created_at).getTime()) / 86400000);
           if (days >= (OVERDUE[lead.stage] ?? 999)) n++;
         });
         setOverdueCount(n);
@@ -104,7 +99,7 @@ export default function Sidebar() {
           <NavItem key={href} href={href} active={active(href)} onClick={() => {}}>
             <Icon active={active(href)} />
             <span className="flex-1 truncate">{label}</span>
-            {href === "/follow-ups" && overdueCount > 0 && <Badge n={overdueCount} />}
+            {href === "/leads" && overdueCount > 0 && <Badge n={overdueCount} />}
           </NavItem>
         ))}
 

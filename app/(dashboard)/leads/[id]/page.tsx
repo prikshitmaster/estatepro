@@ -9,7 +9,7 @@ import { formatPrice } from "@/lib/mock-data";
 import { Lead, LeadStage, LeadSource, Property } from "@/lib/types";
 import { matchPropertiesToLead, budgetDiff, MatchResult } from "@/lib/match-utils";
 import { logActivity, getLeadActivity, ActivityLog, ActivityType, ACTIVITY_ICON, ACTIVITY_COLOR } from "@/lib/db/activity-logs";
-import { getLeadTags, getAllTags, addTagToLead, removeTagFromLead, Tag } from "@/lib/db/tags";
+import { getLeadTags, getAllTags, addTagToLead, removeTagFromLead, createTag, Tag, TAG_COLORS } from "@/lib/db/tags";
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -131,11 +131,15 @@ export default function LeadDetailPage({ params }: Props) {
   const [logType,      setLogType]      = useState<ActivityType>("note");
   const [logContent,   setLogContent]   = useState("");
   const [submitting,   setSubmitting]   = useState(false);
+  const [logError,     setLogError]     = useState("");
 
   // Tags state
-  const [leadTags,    setLeadTags]    = useState<Tag[]>([]);
-  const [allTags,     setAllTags]     = useState<Tag[]>([]);
-  const [tagsOpen,    setTagsOpen]    = useState(false);
+  const [leadTags,     setLeadTags]     = useState<Tag[]>([]);
+  const [allTags,      setAllTags]      = useState<Tag[]>([]);
+  const [tagsOpen,     setTagsOpen]     = useState(false);
+  const [newTagName,   setNewTagName]   = useState("");
+  const [newTagColor,  setNewTagColor]  = useState("#1BC47D");
+  const [creatingTag,  setCreatingTag]  = useState(false);
   const tagsRef = useRef<HTMLDivElement>(null);
 
   // Action Plan state
@@ -242,11 +246,14 @@ export default function LeadDetailPage({ params }: Props) {
   async function handleSubmitLog() {
     if (!logContent.trim() || !lead) return;
     setSubmitting(true);
+    setLogError("");
     try {
       const newLog = await logActivity({ lead_id: lead.id, type: logType, content: logContent.trim() });
       setActivities((prev) => [newLog, ...prev]);
       setLogContent("");
-    } catch {}
+    } catch {
+      setLogError("Could not save. Run COMPLETE-SETUP-V2.sql in Supabase first.");
+    }
     setSubmitting(false);
   }
 
@@ -263,6 +270,20 @@ export default function LeadDetailPage({ params }: Props) {
     await addTagToLead(lead.id, tag.id).catch(() => {});
     setLeadTags((prev) => [...prev, tag]);
     setTagsOpen(false);
+  }
+
+  async function handleCreateAndAddTag() {
+    if (!newTagName.trim() || !lead) return;
+    setCreatingTag(true);
+    try {
+      const tag = await createTag(newTagName.trim(), newTagColor);
+      setAllTags((prev) => [...prev, tag]);
+      await addTagToLead(lead.id, tag.id).catch(() => {});
+      setLeadTags((prev) => [...prev, tag]);
+      setNewTagName("");
+      setTagsOpen(false);
+    } catch {}
+    setCreatingTag(false);
   }
 
   async function handleRemoveTag(tagId: string) {
@@ -445,6 +466,9 @@ export default function LeadDetailPage({ params }: Props) {
                 rows={3}
                 className="w-full text-sm text-gray-700 placeholder-gray-400 resize-none focus:outline-none leading-relaxed"
               />
+              {logError && (
+                <p className="text-xs text-red-500 mt-2 mb-1">{logError}</p>
+              )}
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
                 <p className="text-[11px] text-gray-400">Cmd+Enter to save</p>
                 <button onClick={handleSubmitLog} disabled={!logContent.trim() || submitting}
@@ -462,35 +486,55 @@ export default function LeadDetailPage({ params }: Props) {
               <h3 className="text-sm font-semibold text-gray-900">Activity</h3>
               <span className="text-xs text-gray-400">{activities.length} events</span>
             </div>
-            {activities.length === 0 ? (
-              <div className="px-4 py-10 text-center">
-                <p className="text-3xl mb-2">💬</p>
-                <p className="text-sm text-gray-500 font-medium">No activity yet</p>
-                <p className="text-xs text-gray-400 mt-1">Log a call, note, or message above</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-50">
-                {activities.map((act) => (
-                  <div key={act.id} className="flex gap-3 px-4 py-3">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-base"
-                      style={{ background: ACTIVITY_COLOR[act.type as ActivityType] + "15" }}>
-                      {ACTIVITY_ICON[act.type as ActivityType] ?? "📌"}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-semibold capitalize" style={{ color: ACTIVITY_COLOR[act.type as ActivityType] }}>
-                          {act.type.replace("_", " ")}
-                        </p>
-                        <span className="text-[10px] text-gray-400">{fmtDate(act.created_at)}</span>
-                      </div>
-                      {act.content && (
-                        <p className="text-sm text-gray-700 mt-0.5 leading-relaxed">{act.content}</p>
-                      )}
-                    </div>
+            <div className="relative">
+              {/* FUB-style vertical connector line */}
+              {(activities.length > 0) && (
+                <div className="absolute left-[1.9rem] top-4 bottom-4 w-px bg-gray-100 z-0" />
+              )}
+
+              {activities.length === 0 && (
+                <div className="px-4 py-8 text-center">
+                  <svg className="w-8 h-8 text-gray-200 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  <p className="text-sm text-gray-500 font-medium">No activity yet</p>
+                  <p className="text-xs text-gray-400 mt-1">Log a call, note, or message above</p>
+                </div>
+              )}
+
+              {activities.map((act, i) => (
+                <div key={act.id} className={`flex gap-3 px-4 py-3 relative ${i < activities.length - 1 ? "border-b border-gray-50" : ""}`}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm z-10"
+                    style={{ background: ACTIVITY_COLOR[act.type as ActivityType] + "18", border: `1.5px solid ${ACTIVITY_COLOR[act.type as ActivityType]}30` }}>
+                    {ACTIVITY_ICON[act.type as ActivityType] ?? "📌"}
                   </div>
-                ))}
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-semibold capitalize" style={{ color: ACTIVITY_COLOR[act.type as ActivityType] }}>
+                        {act.type.replace("_", " ")}
+                      </p>
+                      <span className="text-[10px] text-gray-400">{fmtDate(act.created_at)}</span>
+                    </div>
+                    {act.content && (
+                      <p className="text-sm text-gray-700 mt-0.5 leading-relaxed">{act.content}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Lead created — always at bottom */}
+              <div className="flex gap-3 px-4 py-3 border-t border-gray-50 relative">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm z-10 bg-gray-50 border border-gray-100">
+                  <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </div>
+                <div className="flex-1 pt-0.5">
+                  <p className="text-xs font-semibold text-gray-400">Lead created</p>
+                  <p className="text-[11px] text-gray-400">{fmtDate(lead.created_at)} · via {lead.source}</p>
+                </div>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Matched Properties */}
@@ -594,27 +638,62 @@ export default function LeadDetailPage({ params }: Props) {
                   style={{ color: "#1BC47D" }}>
                   + Add
                 </button>
-                {tagsOpen && availableTags.length > 0 && (
-                  <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1 w-44">
-                    {availableTags.map((tag) => (
-                      <button key={tag.id} onClick={() => handleAddTag(tag)}
-                        className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-gray-50 transition-colors">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: tag.color }} />
-                        {tag.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {tagsOpen && availableTags.length === 0 && (
-                  <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-3 px-4 w-44">
-                    <p className="text-xs text-gray-400">All tags added</p>
+                {tagsOpen && (
+                  <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 w-52">
+                    {/* Existing tags */}
+                    {availableTags.length > 0 && (
+                      <div className="py-1 border-b border-gray-100">
+                        {availableTags.map((tag) => (
+                          <button key={tag.id} onClick={() => handleAddTag(tag)}
+                            className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-gray-50 transition-colors">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: tag.color }} />
+                            {tag.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {availableTags.length === 0 && leadTags.length > 0 && (
+                      <div className="px-3 py-2 border-b border-gray-100">
+                        <p className="text-xs text-gray-400">All tags added</p>
+                      </div>
+                    )}
+                    {/* Create new tag inline */}
+                    <div className="px-3 py-2.5">
+                      <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wide mb-2">New tag</p>
+                      <div className="flex gap-1.5">
+                        <input
+                          value={newTagName}
+                          onChange={(e) => setNewTagName(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") handleCreateAndAddTag(); }}
+                          placeholder="Tag name…"
+                          className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1BC47D]"
+                          autoFocus
+                        />
+                        <button onClick={handleCreateAndAddTag} disabled={!newTagName.trim() || creatingTag}
+                          className="px-2.5 py-1.5 text-xs font-bold text-white rounded-lg disabled:opacity-40 transition-opacity"
+                          style={{ background: newTagColor }}>
+                          {creatingTag ? "…" : "+"}
+                        </button>
+                      </div>
+                      <div className="flex gap-1 mt-2">
+                        {TAG_COLORS.map((c) => (
+                          <button key={c} onClick={() => setNewTagColor(c)}
+                            className="w-4 h-4 rounded-full shrink-0 transition-transform hover:scale-110"
+                            style={{
+                              background: c,
+                              outline: newTagColor === c ? `2px solid ${c}` : "none",
+                              outlineOffset: "2px",
+                            }} />
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
             <div className="px-4 py-3">
               {leadTags.length === 0 ? (
-                <p className="text-xs text-gray-400 italic">No tags yet</p>
+                <p className="text-xs text-gray-400 italic">No tags yet — click + Add to create one</p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
                   {leadTags.map((tag) => (
@@ -623,7 +702,7 @@ export default function LeadDetailPage({ params }: Props) {
                       style={{ background: tag.color + "20", color: tag.color }}>
                       {tag.name}
                       <button onClick={() => handleRemoveTag(tag.id)}
-                        className="hover:opacity-70 transition-opacity ml-0.5">×</button>
+                        className="hover:opacity-70 transition-opacity ml-0.5 leading-none">×</button>
                     </span>
                   ))}
                 </div>

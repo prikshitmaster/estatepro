@@ -139,7 +139,7 @@ export default function DashboardPage() {
           />
           <KpiCard label="Need to Call" value={dbOk ? stats.activeFollowUps : "—"}
             sub={overdueLeads.length > 0 ? `${overdueLeads.length} overdue` : "All caught up"}
-            subColor={overdueLeads.length > 0 ? "#EF4444" : "#1BC47D"} color="#F59E0B" href="/follow-ups"
+            subColor={overdueLeads.length > 0 ? "#EF4444" : "#1BC47D"} color="#F59E0B" href="/leads?smart=follow-up"
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>}
           />
           <KpiCard label="In Negotiation" value={dbOk ? stats.activeDeals : "—"} sub="Active deals" color="#8B5CF6" href="/leads"
@@ -301,7 +301,7 @@ export default function DashboardPage() {
                   ))}
                 </div>
                 <div className="px-4 py-2.5" style={{ borderTop: "1px solid #FCD34D" }}>
-                  <Link href="/follow-ups" className="text-xs font-semibold text-amber-700">Go to My Calls →</Link>
+                  <Link href="/leads" className="text-xs font-semibold text-amber-700">View in Leads →</Link>
                 </div>
               </div>
             )}

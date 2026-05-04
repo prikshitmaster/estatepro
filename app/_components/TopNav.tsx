@@ -18,7 +18,6 @@ import { supabase } from "@/lib/supabase";
 const PRIMARY_NAV = [
   { label: "Dashboard",    href: "/dashboard"    },
   { label: "Leads",        href: "/leads"        },
-  { label: "My Calls",     href: "/follow-ups"   },
   { label: "Properties",   href: "/properties"   },
   { label: "Tasks",        href: "/tasks"        },
 ];
