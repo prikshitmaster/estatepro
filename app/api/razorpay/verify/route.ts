@@ -23,21 +23,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Payment verification failed" }, { status: 400 });
     }
 
-    // Upgrade user plan in Supabase
+    // Upgrade user plan in subscriptions table
     const now      = new Date();
     const monthEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     const { error } = await supabaseAdmin
-      .from("profiles")
-      .update({
+      .from("subscriptions")
+      .upsert({
+        user_id,
         plan,
-        subscription_status: "active",
-        subscription_id:     razorpay_payment_id,
-        plan_started_at:     now.toISOString(),
-        plan_ends_at:        monthEnd.toISOString(),
-        trial_ends_at:       null,
-      })
-      .eq("id", user_id);
+        status:      "active",
+        razorpay_id: razorpay_payment_id,
+        started_at:  now.toISOString(),
+        expires_at:  monthEnd.toISOString(),
+        updated_at:  now.toISOString(),
+      }, { onConflict: "user_id" });
 
     if (error) {
       console.error("Supabase update error:", error);
