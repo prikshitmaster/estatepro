@@ -20,6 +20,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import PlanGate from "@/app/_components/PlanGate";
 import { getAllLeads } from "@/lib/db/leads";
 import { getAllProperties } from "@/lib/db/properties";
 import { getAllClients } from "@/lib/db/clients";
@@ -58,6 +59,10 @@ const ALL_STAGES:  LeadStage[]  = ["new","contacted","viewing","negotiating","cl
 const ALL_SOURCES: LeadSource[] = ["referral","website","social","walk-in","ad","other"];
 
 export default function AnalyticsPage() {
+  return <PlanGate requires="pro" feature="Reports & Analytics"><AnalyticsPageInner /></PlanGate>;
+}
+
+function AnalyticsPageInner() {
   // Raw data from Supabase
   const [leads, setLeads]         = useState<Lead[]>([]);
   const [clientCount, setClientCount] = useState(0);

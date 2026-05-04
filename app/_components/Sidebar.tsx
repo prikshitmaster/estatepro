@@ -6,24 +6,28 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getAllLeads } from "@/lib/db/leads";
+import { getUserPlan } from "@/lib/db/subscriptions";
+import type { Plan } from "@/lib/plans";
+
 // ── Nav structure ─────────────────────────────────────────────────────────────
 
 const coreItems = [
-  { label: "Dashboard",       href: "/dashboard",    icon: DashboardIcon  },
-  { label: "Leads",           href: "/leads",        icon: LeadsIcon      },
-  { label: "Tasks",           href: "/tasks",        icon: TasksIcon      },
-  { label: "Auto Capture",    href: "/auto-capture", icon: CaptureIcon    },
+  { label: "Dashboard",    href: "/dashboard",    icon: DashboardIcon },
+  { label: "Leads",        href: "/leads",        icon: LeadsIcon     },
+  { label: "Tasks",        href: "/tasks",        icon: TasksIcon     },
+  { label: "Auto Capture", href: "/auto-capture", icon: CaptureIcon   },
 ];
 
+// requires: minimum plan needed; undefined = free
 const toolItems = [
-  { label: "Properties",       href: "/properties",   icon: BuildingIcon  },
-  { label: "Site Visits",      href: "/visits",       icon: CalendarIcon  },
-  { label: "Commission",       href: "/deals",        icon: CoinIcon      },
-  { label: "Clients",          href: "/clients",      icon: ClientIcon    },
-  { label: "Property Links",   href: "/secure-share", icon: LinkIcon      },
-  { label: "Newspaper Leads",  href: "/newspaper",    icon: NewsIcon      },
-  { label: "Msg Templates",    href: "/ai-tools",     icon: MsgIcon       },
-  { label: "Reports",          href: "/analytics",    icon: ChartIcon     },
+  { label: "Properties",     href: "/properties",   icon: BuildingIcon, requires: undefined    },
+  { label: "Site Visits",    href: "/visits",       icon: CalendarIcon, requires: "starter" as Plan },
+  { label: "Commission",     href: "/deals",        icon: CoinIcon,     requires: "pro"     as Plan },
+  { label: "Clients",        href: "/clients",      icon: ClientIcon,   requires: undefined    },
+  { label: "Property Links", href: "/secure-share", icon: LinkIcon,     requires: "starter" as Plan },
+  { label: "Newspaper Leads",href: "/newspaper",    icon: NewsIcon,     requires: "starter" as Plan },
+  { label: "Msg Templates",  href: "/ai-tools",     icon: MsgIcon,      requires: "starter" as Plan },
+  { label: "Reports",        href: "/analytics",    icon: ChartIcon,    requires: "pro"     as Plan },
 ];
 
 function getInitials(name: string) {
@@ -41,10 +45,17 @@ export default function Sidebar() {
   const [userName,     setUserName]     = useState("");
   const [userEmail,    setUserEmail]    = useState("");
   const [overdueCount, setOverdueCount] = useState(0);
+  const [userPlan,     setUserPlan]     = useState<Plan>("free");
+
+  const PLAN_ORDER: Plan[] = ["free", "starter", "pro"];
+  function planMeets(required: Plan) {
+    return PLAN_ORDER.indexOf(userPlan) >= PLAN_ORDER.indexOf(required);
+  }
 
   useEffect(() => { if (isOnTool) setToolsOpen(true); }, [pathname, isOnTool]);
 
   useEffect(() => {
+    getUserPlan().then(setUserPlan);
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;
       setUserName(user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "");
@@ -120,12 +131,21 @@ export default function Sidebar() {
           </svg>
         </button>
 
-        {toolsOpen && toolItems.map(({ label, href, icon: Icon }) => (
-          <NavItem key={href} href={href} active={active(href)} onClick={() => {}}>
-            <Icon active={active(href)} />
-            <span className="flex-1 truncate">{label}</span>
-          </NavItem>
-        ))}
+        {toolsOpen && toolItems.map(({ label, href, icon: Icon, requires }) => {
+          const locked = requires && !planMeets(requires);
+          return (
+            <NavItem key={href} href={href} active={active(href)} onClick={() => {}}>
+              <Icon active={active(href)} />
+              <span className="flex-1 truncate" style={{ opacity: locked ? 0.5 : 1 }}>{label}</span>
+              {locked && (
+                <svg className="w-3 h-3 shrink-0" style={{ color: "#6B7280" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              )}
+            </NavItem>
+          );
+        })}
 
         {/* Upgrade banner */}
         <Link

@@ -23,6 +23,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import PlanGate from "@/app/_components/PlanGate";
 import { getAllLeads } from "@/lib/db/leads";
 import { formatPrice } from "@/lib/mock-data";
 import { Lead, LeadStage } from "@/lib/types";
@@ -156,6 +157,10 @@ const TEMPLATES: Record<LeadStage, TemplateFn[]> = {
 
 // ── Main page component ───────────────────────────────────────────────────────
 export default function AIToolsPage() {
+  return <PlanGate requires="starter" feature="Message Templates"><AIToolsPageInner /></PlanGate>;
+}
+
+function AIToolsPageInner() {
   const [leads, setLeads]         = useState<Lead[]>([]);
   const [loading, setLoading]     = useState(true);
 

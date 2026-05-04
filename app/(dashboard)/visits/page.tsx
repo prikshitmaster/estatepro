@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import PlanGate from "@/app/_components/PlanGate";
 import { SiteVisit, SiteVisitStatus } from "@/lib/types";
 import { getAllSiteVisits, addSiteVisit, updateSiteVisit } from "@/lib/db/site-visits";
 
@@ -38,6 +39,10 @@ type Tab = "upcoming" | "completed" | "all";
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function VisitsPage() {
+  return <PlanGate requires="starter" feature="Site Visit Tracking"><VisitsPageInner /></PlanGate>;
+}
+
+function VisitsPageInner() {
   const router       = useRouter();
   const searchParams = useSearchParams();
 

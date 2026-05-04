@@ -16,6 +16,7 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import PlanGate from "@/app/_components/PlanGate";
 import { NewspaperLead, NewspaperLeadAction } from "@/lib/types";
 import {
   getAllNewspaperLeads,
@@ -329,6 +330,10 @@ function LeadDrawer({
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export default function NewspaperPage() {
+  return <PlanGate requires="starter" feature="Newspaper Leads"><NewspaperPageInner /></PlanGate>;
+}
+
+function NewspaperPageInner() {
   const router = useRouter();
 
   const [leads,        setLeads]        = useState<NewspaperLead[]>([]);

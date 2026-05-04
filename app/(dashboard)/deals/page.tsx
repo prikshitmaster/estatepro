@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import PlanGate from "@/app/_components/PlanGate";
 import { Deal } from "@/lib/types";
 import { getAllDeals, addDeal, updateDeal, deleteDeal } from "@/lib/db/deals";
 import { formatPrice } from "@/lib/mock-data";
@@ -40,6 +41,10 @@ const BLANK = {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function DealsPage() {
+  return <PlanGate requires="pro" feature="Commission Tracking"><DealsPageInner /></PlanGate>;
+}
+
+function DealsPageInner() {
   const router       = useRouter();
   const searchParams = useSearchParams();
 

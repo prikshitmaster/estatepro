@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import PlanGate from "@/app/_components/PlanGate";
 import {
   getSecureShareLinks,
   getShareViewLogs,
@@ -13,6 +14,10 @@ import { SecureShareLink, ShareViewLog } from "@/lib/types";
 const ACCENT = "#6366F1"; // indigo — distinguishes Secure Share as a premium feature
 
 export default function SecureSharePage() {
+  return <PlanGate requires="starter" feature="Property Share Links"><SecureSharePageInner /></PlanGate>;
+}
+
+function SecureSharePageInner() {
   const [links, setLinks]       = useState<SecureShareLink[]>([]);
   const [loading, setLoading]   = useState(true);
 
