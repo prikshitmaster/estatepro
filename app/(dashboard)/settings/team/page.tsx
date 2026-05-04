@@ -3,6 +3,11 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { getUserPlan } from "@/lib/db/subscriptions";
+import { PLANS, isOverLimit } from "@/lib/plans";
+import type { Plan } from "@/lib/plans";
+import UpgradeModal from "@/app/_components/UpgradeModal";
+import { useRouter } from "next/navigation";
 
 type Role = "admin" | "agent" | "viewer";
 
@@ -28,6 +33,7 @@ const ROLE_DESC: Record<Role, string> = {
 };
 
 export default function TeamPage() {
+  const router = useRouter();
   const [members,      setMembers]      = useState<TeamMember[]>([]);
   const [inviteEmail,  setInviteEmail]  = useState("");
   const [inviteRole,   setInviteRole]   = useState<Role>("agent");
@@ -36,17 +42,23 @@ export default function TeamPage() {
   const [inviteOk,     setInviteOk]     = useState("");
   const [currentUser,  setCurrentUser]  = useState<{ email: string; name: string } | null>(null);
   const [removing,     setRemoving]     = useState<string | null>(null);
+  const [userPlan,     setUserPlan]     = useState<Plan>("free");
+  const [showUpgrade,  setShowUpgrade]  = useState(false);
 
   useEffect(() => { loadTeam(); }, []);
 
   async function loadTeam() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const [{ data: { user } }, plan] = await Promise.all([
+      supabase.auth.getUser(),
+      getUserPlan(),
+    ]);
     if (!user) return;
     setCurrentUser({
       email: user.email ?? "",
       name:  user.user_metadata?.full_name ?? user.email ?? "",
     });
     setMembers((user.user_metadata?.team_members as TeamMember[]) ?? []);
+    setUserPlan(plan);
   }
 
   async function persistTeam(updated: TeamMember[]) {
@@ -62,6 +74,12 @@ export default function TeamPage() {
     if (!email.includes("@")) { setInviteErr("Enter a valid email address."); return; }
     if (members.some((m) => m.email === email)) { setInviteErr("This person is already invited."); return; }
     if (email === currentUser?.email?.toLowerCase()) { setInviteErr("You are already the owner."); return; }
+
+    // Hard limit: 1 owner + members must not exceed plan team limit
+    if (isOverLimit(userPlan, "team", members.length + 1)) {
+      setShowUpgrade(true);
+      return;
+    }
 
     setInviting(true);
 
@@ -108,6 +126,15 @@ export default function TeamPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 pb-24 space-y-5">
+
+      {showUpgrade && (
+        <UpgradeModal
+          currentPlan={userPlan}
+          resource="team"
+          onClose={() => setShowUpgrade(false)}
+          onUpgrade={(_plan) => { setShowUpgrade(false); router.push("/settings/billing"); }}
+        />
+      )}
 
       {/* Header */}
       <div className="flex items-center gap-3 mb-2">
@@ -157,6 +184,14 @@ export default function TeamPage() {
           <p className="text-sm font-semibold text-gray-900">
             Members <span className="text-gray-400 font-normal">({1 + members.length})</span>
           </p>
+          <span className="text-xs text-gray-400">
+            {1 + members.length} / {PLANS[userPlan].team} seats
+            {isOverLimit(userPlan, "team", members.length + 1) && (
+              <button onClick={() => setShowUpgrade(true)} className="ml-2 text-amber-600 font-semibold hover:underline">
+                Upgrade
+              </button>
+            )}
+          </span>
         </div>
 
         {/* Owner row */}
