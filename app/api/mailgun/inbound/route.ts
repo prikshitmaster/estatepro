@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin }             from "@/lib/supabase-admin";
 import { verifyMailgunWebhook }      from "@/lib/mailgun-verify";
 import { parseEmailWithAI }          from "@/lib/ai-email-parser";
+import { parseInboundEmail }         from "@/lib/email-parser";
 import type { PropertyInterest, LeadSource } from "@/lib/types";
 
 function toPropertyInterest(raw: string | null): PropertyInterest | undefined {
@@ -72,17 +73,29 @@ export async function POST(req: NextRequest) {
 
     const userId = inbox.user_id as string;
 
-    // ── 4. AI parse — handles any portal template dynamically ─────────────────
-    let parsed;
-    try {
-      parsed = await parseEmailWithAI(from, subject, body);
-    } catch (aiErr) {
-      console.error("[mailgun/inbound] AI parse error:", aiErr);
-      return NextResponse.json({ error: "AI parsing failed" }, { status: 500 });
+    // ── 4. Parse — AI first, regex fallback if AI unavailable/fails ──────────
+    let parsed: { name: string | null; phone: string | null; email: string | null; location: string | null; budget_min: number | null; budget_max: number | null; property_interest: string | null; source: string; message: string | null } | null = null;
+
+    if (process.env.GEMINI_API_KEY) {
+      parsed = await parseEmailWithAI(from, subject, body).catch((err) => {
+        console.error("[mailgun/inbound] AI parse failed, falling back to regex:", err?.message);
+        return null;
+      });
     }
 
     if (!parsed) {
-      return NextResponse.json({ skipped: true, reason: "Not a lead email" });
+      const regex = parseInboundEmail(from, subject, body, "");
+      parsed = {
+        name:              regex.name              || null,
+        phone:             regex.phone             || null,
+        email:             regex.email             || null,
+        location:          regex.location          || null,
+        budget_min:        regex.budget_min        || null,
+        budget_max:        regex.budget_max        || null,
+        property_interest: regex.property_interest || null,
+        source:            regex.source            || "other",
+        message:           regex.raw_message       || null,
+      };
     }
 
     if (!parsed.phone && !parsed.email && !parsed.name) {
