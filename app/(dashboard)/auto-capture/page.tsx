@@ -97,13 +97,15 @@ export default function AutoCapturePage() {
     setTestParsed(null);
     try {
       const webhookUrl = `/api/inbound-email?id=${uniqueId}`;
+      // Random 10-digit number starting with 9 to avoid duplicates on repeat tests
+      const randomPhone = "9" + Math.floor(100000000 + Math.random() * 900000000);
       const res = await fetch(webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           from:    "noreply@99acres.com",
           subject: "New Lead for Your Property",
-          text:    "Name: Rahul Sharma\nPhone: 9876543210\nEmail: rahul@gmail.com\nCity: Mumbai\nBudget: Rs. 50 Lac - Rs. 1 Cr\nBedrooms: 2 BHK\nMessage: Looking for a flat in Andheri West",
+          text:    `Name: Rahul Sharma\nPhone: ${randomPhone}\nEmail: rahul${randomPhone}@gmail.com\nCity: Mumbai\nBudget: Rs. 50 Lac - Rs. 1 Cr\nBedrooms: 2 BHK\nMessage: Looking for a flat in Andheri West`,
           html:    "",
         }),
       });
@@ -296,7 +298,7 @@ export default function AutoCapturePage() {
             <div className="font-mono text-xs text-gray-600 space-y-0.5">
               <p><span className="text-gray-400">From:</span> noreply@99acres.com</p>
               <p><span className="text-gray-400">Name:</span> Rahul Sharma</p>
-              <p><span className="text-gray-400">Phone:</span> 9876543210</p>
+              <p><span className="text-gray-400">Phone:</span> random (new each test)</p>
               <p><span className="text-gray-400">City:</span> Mumbai · 2 BHK · ₹50L–₹1Cr</p>
             </div>
           </div>
