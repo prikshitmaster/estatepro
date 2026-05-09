@@ -424,6 +424,28 @@ export default function LeadDetailPage({ params }: Props) {
         {/* ══ LEFT: Activity Feed ══ */}
         <div className="flex-1 min-w-0 space-y-4">
 
+          {/* Notes — first thing visible */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="px-4 pt-4 pb-1 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-[#1BC47D]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <h3 className="text-sm font-semibold text-gray-900">Notes</h3>
+              </div>
+              {saveStatus === "saved" && <span className="text-[10px] text-[#1BC47D] font-semibold">✓ Saved</span>}
+            </div>
+            <div className="px-4 pb-4 pt-2">
+              <textarea
+                value={notes}
+                onChange={(e) => handleNotesChange(e.target.value)}
+                placeholder="Add notes about this lead…"
+                rows={3}
+                className="w-full text-sm text-gray-700 placeholder-gray-400 resize-none focus:outline-none leading-relaxed"
+              />
+            </div>
+          </div>
+
           {/* Log Activity Input */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             {/* Type selector tabs */}
@@ -807,23 +829,6 @@ export default function LeadDetailPage({ params }: Props) {
             </div>
           </div>
 
-          {/* Notes */}
-          <div className="bg-white rounded-xl border border-gray-200">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900">Notes</h3>
-              {saveStatus === "saved" && <span className="text-[10px] text-[#1BC47D] font-semibold">✓ Saved</span>}
-            </div>
-            <div className="p-4">
-              <textarea
-                value={notes}
-                onChange={(e) => handleNotesChange(e.target.value)}
-                placeholder="Add notes about this lead…"
-                rows={4}
-                className="w-full text-sm text-gray-700 placeholder-gray-400 resize-none focus:outline-none leading-relaxed"
-              />
-            </div>
-          </div>
-
           {/* Action Plan */}
           {actionPlans.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-200">
@@ -964,36 +969,70 @@ function PropertyMatchCard({ prop, lead, tier, diff = 0 }: {
   const waMsg = encodeURIComponent(
     `Hi ${lead.name}! 👋\n\nI found a property matching your requirement:\n\n🏢 *${prop.title}*\n📍 ${prop.location}\n💰 *${formatPrice(prop.price)}*\n\nWould you like to schedule a visit?`
   );
-  const diffLabel = diff > 0 ? `+${formatPrice(diff)} above` : diff < 0 ? `${formatPrice(Math.abs(diff))} below` : "";
+  const diffLabel = diff > 0 ? `+${formatPrice(diff)} over budget` : diff < 0 ? `${formatPrice(Math.abs(diff))} under budget` : "";
+  const isPerfect = tier === "perfect";
 
   return (
-    <div className="rounded-xl overflow-hidden border" style={{ borderColor: tier === "perfect" ? "#A7F3D0" : "#FDE68A" }}>
-      <div className="flex gap-3 p-3">
-        <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 flex items-center justify-center text-xl"
-          style={{ background: tier === "perfect" ? "#ECFDF5" : "#FFFBEB" }}>
-          {thumb
-            // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={thumb} alt="" className="w-full h-full object-cover" />
-            : "🏢"}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-900 truncate">{prop.title}</p>
-          <p className="text-xs text-gray-400">📍 {prop.location}</p>
-          <p className="text-sm font-bold" style={{ color: "#1BC47D" }}>{formatPrice(prop.price)}</p>
-          {diffLabel && <p className="text-[10px] text-amber-600">{diffLabel} budget</p>}
-        </div>
+    <div className="rounded-2xl overflow-hidden border bg-white transition-shadow hover:shadow-md"
+      style={{ borderColor: isPerfect ? "#BBF7D0" : "#FDE68A" }}>
+      {/* Image strip */}
+      <div className="relative h-28 w-full overflow-hidden"
+        style={{ background: isPerfect ? "#ECFDF5" : "#FFFBEB" }}>
+        {thumb
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={thumb} alt="" className="w-full h-full object-cover" />
+          : (
+            <div className="w-full h-full flex items-center justify-center">
+              <svg className="w-10 h-10 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+          )}
+        {/* tier badge */}
+        <span className="absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full"
+          style={{
+            background: isPerfect ? "#1BC47D" : "#F59E0B",
+            color: "#fff",
+            letterSpacing: "0.03em"
+          }}>
+          {isPerfect ? "Perfect Match" : "Close Match"}
+        </span>
       </div>
-      <div className="flex border-t" style={{ borderColor: tier === "perfect" ? "#A7F3D0" : "#FDE68A" }}>
+
+      {/* Details */}
+      <div className="px-3 pt-2.5 pb-2">
+        <p className="text-sm font-bold text-gray-900 truncate leading-snug">{prop.title}</p>
+        <div className="flex items-center justify-between mt-0.5">
+          <p className="text-xs text-gray-400 truncate">
+            <svg className="w-3 h-3 inline mr-0.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            </svg>
+            {prop.location}
+          </p>
+          <p className="text-sm font-bold ml-2 shrink-0" style={{ color: "#1BC47D" }}>{formatPrice(prop.price)}</p>
+        </div>
+        {diffLabel && (
+          <p className="text-[10px] mt-0.5" style={{ color: diff > 0 ? "#F59E0B" : "#6B7280" }}>{diffLabel}</p>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2 px-3 pb-3">
         <Link href={`/properties/${prop.id}`}
-          className="flex-1 py-2 text-center text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors border-r border-gray-100">
-          View
+          className="flex-1 py-2 text-center text-xs font-semibold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+          View Details
         </Link>
-        <a href={`https://wa.me/91${(lead.phone ?? "").replace(/\D/g, "")}?text=${waMsg}`}
-          target="_blank" rel="noopener noreferrer"
-          className="flex-1 py-2 text-center text-xs font-semibold text-white hover:opacity-90 transition-opacity"
-          style={{ background: "#25D366" }}>
-          Send on WhatsApp
-        </a>
+        {(lead.phone ?? "").replace(/\D/g, "").length >= 10 && (
+          <a href={`https://wa.me/91${(lead.phone ?? "").replace(/\D/g, "")}?text=${waMsg}`}
+            target="_blank" rel="noopener noreferrer"
+            className="flex-1 py-2 text-center text-xs font-bold text-white rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-1"
+            style={{ background: "#25D366" }}>
+            <svg className="w-3.5 h-3.5 fill-white" viewBox="0 0 24 24">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.96 9.96 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/>
+            </svg>
+            Send
+          </a>
+        )}
       </div>
     </div>
   );

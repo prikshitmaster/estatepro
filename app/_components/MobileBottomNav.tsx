@@ -1,7 +1,6 @@
 // app/_components/MobileBottomNav.tsx — fixed bottom tab bar for mobile
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -22,104 +21,28 @@ const moreItems = [
 ];
 
 export default function MobileBottomNav() {
-  const pathname  = usePathname();
-  const [open, setOpen] = useState(false);
-
-  const moreActive = moreItems.some(({ href }) => pathname === href || pathname.startsWith(href + "/"));
+  const pathname = usePathname();
 
   return (
-    <>
-      {/* ── Bottom Tab Bar ── */}
-      <nav
-        className="fixed bottom-0 left-0 right-0 z-40 flex safe-area-bottom sm:hidden"
-        style={{ background: "#fff", borderTop: "1px solid #EEF1F6" }}
-      >
-        {mainTabs.map(({ label, href, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + "/");
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => setOpen(false)}
-              className="flex flex-col items-center justify-center flex-1 py-2 gap-0.5 transition-colors"
-              style={{ color: active ? "#1BC47D" : "#9CA3AF" }}
-            >
-              <Icon active={active} />
-              <span style={{ fontSize: 10, fontWeight: active ? 600 : 500 }}>{label}</span>
-            </Link>
-          );
-        })}
-
-        {/* More button */}
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="flex flex-col items-center justify-center flex-1 py-2 gap-0.5 transition-colors"
-          style={{ color: open || moreActive ? "#1BC47D" : "#9CA3AF", background: "transparent", border: "none" }}
-        >
-          <MoreIcon active={open || moreActive} />
-          <span style={{ fontSize: 10, fontWeight: open || moreActive ? 600 : 500 }}>More</span>
-        </button>
-      </nav>
-
-      {/* ── More drawer backdrop ── */}
-      {open && (
-        <div
-          className="fixed inset-0 z-30 sm:hidden"
-          style={{ background: "rgba(0,0,0,0.35)" }}
-          onClick={() => setOpen(false)}
-        />
-      )}
-
-      {/* ── More drawer panel ── */}
-      <div
-        className="fixed left-0 right-0 z-40 sm:hidden rounded-t-2xl overflow-hidden"
-        style={{
-          bottom: 57,
-          background: "#fff",
-          borderTop: "1px solid #EEF1F6",
-          transform: open ? "translateY(0)" : "translateY(110%)",
-          transition: "transform 0.28s cubic-bezier(0.4,0,0.2,1)",
-          boxShadow: "0 -8px 32px rgba(0,0,0,0.12)",
-        }}
-      >
-        <div className="flex items-center justify-between px-5 pt-4 pb-2">
-          <p style={{ fontSize: 13, fontWeight: 700, color: "#1A1D23" }}>Menu</p>
-          <button
-            onClick={() => setOpen(false)}
-            style={{ background: "#F3F4F6", border: "none", borderRadius: 99, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-40 flex safe-area-bottom sm:hidden"
+      style={{ background: "#fff", borderTop: "1px solid #EEF1F6" }}
+    >
+      {mainTabs.map(({ label, href, icon: Icon }) => {
+        const active = pathname === href || pathname.startsWith(href + "/");
+        return (
+          <Link
+            key={href}
+            href={href}
+            className="flex flex-col items-center justify-center flex-1 py-2 gap-0.5 transition-colors"
+            style={{ color: active ? "#1BC47D" : "#9CA3AF" }}
           >
-            <svg width="14" height="14" fill="none" stroke="#6B7280" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-4 gap-0 px-2 pb-4">
-          {moreItems.map(({ label, href, icon: Icon }) => {
-            const active = pathname === href || pathname.startsWith(href + "/");
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setOpen(false)}
-                className="flex flex-col items-center gap-1.5 py-3 px-1 rounded-xl transition-colors"
-                style={{ color: active ? "#1BC47D" : "#374151", background: active ? "#F0FDF9" : "transparent" }}
-              >
-                <div
-                  className="flex items-center justify-center rounded-xl"
-                  style={{ width: 44, height: 44, background: active ? "#1BC47D18" : "#F5F7FA" }}
-                >
-                  <Icon active={active} />
-                </div>
-                <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, textAlign: "center", lineHeight: 1.3, color: active ? "#1BC47D" : "#374151" }}>
-                  {label}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-    </>
+            <Icon active={active} />
+            <span style={{ fontSize: 10, fontWeight: active ? 600 : 500 }}>{label}</span>
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
 
