@@ -326,7 +326,7 @@ export default function LeadDetailPage({ params }: Props) {
   const currentLogType = LOG_TYPES.find((l) => l.type === logType) ?? LOG_TYPES[0];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 pb-24 md:pb-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 pb-24 md:pb-6" style={{ overflowX: "clip" }}>
 
       {/* ── Page Header ── */}
       <div className="flex items-center gap-3 mb-5">
@@ -499,41 +499,37 @@ export default function LeadDetailPage({ params }: Props) {
           </div>
 
           {/* Log Activity Input */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            {/* Type selector tabs */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex border-b border-gray-100">
               {LOG_TYPES.map((lt) => (
                 <button key={lt.type} onClick={() => setLogType(lt.type)}
-                  className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors flex-1 justify-center"
+                  className="flex items-center gap-1.5 px-3 py-3 text-sm font-medium transition-colors flex-1 justify-center"
                   style={{
                     color: logType === lt.type ? "#1BC47D" : "#6B7280",
                     borderBottom: logType === lt.type ? "2px solid #1BC47D" : "2px solid transparent",
                     background: "transparent"
                   }}>
                   {lt.icon}
-                  <span className="hidden sm:inline">{lt.label}</span>
+                  <span className="text-xs ml-1">{lt.label}</span>
                 </button>
               ))}
             </div>
-            {/* Text input */}
             <div className="p-4">
               <textarea
                 value={logContent}
                 onChange={(e) => setLogContent(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSubmitLog(); }}
                 placeholder={currentLogType.placeholder}
-                rows={3}
+                rows={2}
                 className="w-full text-sm text-gray-700 placeholder-gray-400 resize-none focus:outline-none leading-relaxed"
               />
-              {logError && (
-                <p className="text-xs text-red-500 mt-2 mb-1">{logError}</p>
-              )}
+              {logError && <p className="text-xs text-red-500 mt-1">{logError}</p>}
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-                <p className="text-[11px] text-gray-400">Cmd+Enter to save</p>
+                <p className="text-[11px] text-gray-400 hidden sm:block">Cmd+Enter to save</p>
                 <button onClick={handleSubmitLog} disabled={!logContent.trim() || submitting}
-                  className="px-4 py-1.5 rounded-lg text-sm font-semibold text-white transition-all disabled:opacity-40"
+                  className="px-4 py-1.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40 ml-auto"
                   style={{ background: "#1BC47D" }}>
-                  {submitting ? "Saving…" : `Log ${currentLogType.label}`}
+                  {submitting ? "…" : `Save`}
                 </button>
               </div>
             </div>
@@ -605,9 +601,10 @@ export default function LeadDetailPage({ params }: Props) {
                   {matchedProperties.perfect.length + matchedProperties.close.length} found
                 </span>
               </div>
-              {/* Mobile: horizontal scroll; Desktop: vertical stack */}
-              <div className="md:hidden overflow-x-auto">
-                <div className="flex gap-3 p-3" style={{ width: "max-content" }}>
+              {/* Mobile: horizontal scroll contained within section; Desktop: vertical stack */}
+              <div className="md:hidden" style={{ overflow: "hidden" }}>
+                <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" as never }}>
+                  <div className="flex gap-3 px-3 pt-2 pb-3" style={{ width: "max-content" }}>
                   {[...matchedProperties.perfect.map(p => ({ p, tier: "perfect" as const, diff: 0 })),
                     ...matchedProperties.close.map(p => ({ p, tier: "close" as const, diff: budgetDiff(p.price, lead.budget_min ?? 0, lead.budget_max ?? 0) }))
                   ].map(({ p, tier, diff }) => (
@@ -615,6 +612,7 @@ export default function LeadDetailPage({ params }: Props) {
                       <PropertyMatchCard prop={p} lead={lead} tier={tier} diff={diff} />
                     </div>
                   ))}
+                  </div>
                 </div>
               </div>
               <div className="hidden md:block p-4 space-y-3">
