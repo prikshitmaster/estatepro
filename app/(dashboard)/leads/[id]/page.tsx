@@ -143,6 +143,9 @@ export default function LeadDetailPage({ params }: Props) {
   const [assignedPlan,     setAssignedPlan]     = useState<string>("");  // plan id
   const [planPickerOpen,   setPlanPickerOpen]   = useState(false);
 
+  // Budget edit toggle
+  const [budgetEditing, setBudgetEditing] = useState(false);
+
   const saveTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -153,7 +156,13 @@ export default function LeadDetailPage({ params }: Props) {
       const data = await getLeadById(id);
       if (!data) { setNotFound(true); setLoading(false); return; }
       setLead(data);
-      setNotes(data.notes ?? "");
+      // Strip auto-captured metadata lines from notes textarea display
+      const cleanNotes = (data.notes ?? "")
+        .split("\n")
+        .filter((l) => !l.startsWith("Message:") && !l.startsWith("Source email:"))
+        .join("\n")
+        .trim();
+      setNotes(cleanNotes);
       setLoading(false);
 
       // Load activity logs
@@ -550,6 +559,35 @@ export default function LeadDetailPage({ params }: Props) {
         {/* ══ RIGHT: Contact Info Panel ══ */}
         <div className="w-full md:w-72 lg:w-80 shrink-0 space-y-4">
 
+          {/* Original Enquiry — at top of sidebar for auto-captured leads */}
+          {lead.notes && lead.notes.includes("Source email:") && (() => {
+            const lines = lead.notes.split("\n");
+            const msgLine = lines.find((l) => l.startsWith("Message:"));
+            const srcLine = lines.find((l) => l.startsWith("Source email:"));
+            const message = msgLine ? msgLine.replace(/^Message:\s*/, "") : null;
+            const srcEmail = srcLine ? srcLine.replace(/^Source email:\s*/, "") : null;
+            return (
+              <div className="bg-amber-50 rounded-xl border border-amber-200">
+                <div className="px-4 py-3 border-b border-amber-100 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <h3 className="text-sm font-semibold text-amber-800">Original Enquiry Email</h3>
+                </div>
+                <div className="px-4 py-3 space-y-2">
+                  {srcEmail && (
+                    <p className="text-xs text-amber-700"><span className="font-semibold">From:</span> {srcEmail}</p>
+                  )}
+                  {message ? (
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{message}</p>
+                  ) : (
+                    <p className="text-xs text-amber-600 italic">No message body extracted</p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Contact Info */}
           <div className="bg-white rounded-xl border border-gray-200">
             <div className="px-4 py-3 border-b border-gray-100">
@@ -688,10 +726,15 @@ export default function LeadDetailPage({ params }: Props) {
 
           {/* Requirements */}
           <div className="bg-white rounded-xl border border-gray-200">
-            <div className="px-4 py-3 border-b border-gray-100">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-gray-900">Requirements</h3>
+              <button onClick={() => setBudgetEditing((v) => !v)}
+                className="text-xs font-semibold hover:opacity-70 transition-opacity"
+                style={{ color: "#1BC47D" }}>
+                {budgetEditing ? "Done" : "Edit"}
+              </button>
             </div>
-            <div className="px-4 py-3 space-y-4">
+            <div className="px-4 py-3 space-y-3">
               {/* Property type */}
               <div>
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Property Type</p>
@@ -710,78 +753,59 @@ export default function LeadDetailPage({ params }: Props) {
                 </div>
               </div>
 
-              {/* Budget Max */}
-              <div>
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                  Max Budget <span className="text-gray-600 font-bold normal-case">{formatPrice(lead.budget_max)}</span>
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {BUDGET_PRESETS.map((p) => (
-                    <button key={p.label} onClick={() => save({ budget_max: p.value })}
-                      className="px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all"
-                      style={{
-                        background: lead.budget_max === p.value ? "#1BC47D" : "#F9FAFB",
-                        color: lead.budget_max === p.value ? "#fff" : "#6B7280",
-                        borderColor: lead.budget_max === p.value ? "#1BC47D" : "#E5E7EB"
-                      }}>
-                      {p.label}
-                    </button>
-                  ))}
+              {/* Budget — compact display, expands on edit */}
+              {!budgetEditing ? (
+                <div className="flex items-center justify-between py-1">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Budget</p>
+                  <p className="text-sm font-semibold text-gray-800">
+                    {(lead.budget_min ?? 0) > 0 ? `${formatPrice(lead.budget_min)} – ` : ""}
+                    {(lead.budget_max ?? 0) > 0 ? formatPrice(lead.budget_max) : <span className="text-gray-400 font-normal text-xs">Not set</span>}
+                  </p>
                 </div>
-                <CustomBudgetInput onSave={(v) => save({ budget_max: v })} />
-              </div>
-
-              {/* Budget Min */}
-              <div>
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                  Min Budget <span className="text-gray-600 font-bold normal-case">{formatPrice(lead.budget_min)}</span>
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {BUDGET_PRESETS.map((p) => (
-                    <button key={p.label} onClick={() => save({ budget_min: p.value })}
-                      className="px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all"
-                      style={{
-                        background: lead.budget_min === p.value ? "#6366F1" : "#F9FAFB",
-                        color: lead.budget_min === p.value ? "#fff" : "#6B7280",
-                        borderColor: lead.budget_min === p.value ? "#6366F1" : "#E5E7EB"
-                      }}>
-                      {p.label}
-                    </button>
-                  ))}
+              ) : (
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                      Max Budget <span className="text-gray-600 font-bold normal-case">{formatPrice(lead.budget_max)}</span>
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {BUDGET_PRESETS.map((p) => (
+                        <button key={p.label} onClick={() => save({ budget_max: p.value })}
+                          className="px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all"
+                          style={{
+                            background: lead.budget_max === p.value ? "#1BC47D" : "#F9FAFB",
+                            color: lead.budget_max === p.value ? "#fff" : "#6B7280",
+                            borderColor: lead.budget_max === p.value ? "#1BC47D" : "#E5E7EB"
+                          }}>
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                    <CustomBudgetInput onSave={(v) => save({ budget_max: v })} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                      Min Budget <span className="text-gray-600 font-bold normal-case">{formatPrice(lead.budget_min)}</span>
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {BUDGET_PRESETS.map((p) => (
+                        <button key={p.label} onClick={() => save({ budget_min: p.value })}
+                          className="px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all"
+                          style={{
+                            background: lead.budget_min === p.value ? "#6366F1" : "#F9FAFB",
+                            color: lead.budget_min === p.value ? "#fff" : "#6B7280",
+                            borderColor: lead.budget_min === p.value ? "#6366F1" : "#E5E7EB"
+                          }}>
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                    <CustomBudgetInput onSave={(v) => save({ budget_min: v })} />
+                  </div>
                 </div>
-                <CustomBudgetInput onSave={(v) => save({ budget_min: v })} />
-              </div>
+              )}
             </div>
           </div>
-
-          {/* Original Enquiry — shown when lead was auto-captured from email */}
-          {lead.notes && lead.notes.includes("Source email:") && (() => {
-            const lines = lead.notes.split("\n");
-            const msgLine = lines.find((l) => l.startsWith("Message:"));
-            const srcLine = lines.find((l) => l.startsWith("Source email:"));
-            const message = msgLine ? msgLine.replace(/^Message:\s*/, "") : null;
-            const srcEmail = srcLine ? srcLine.replace(/^Source email:\s*/, "") : null;
-            return (
-              <div className="bg-amber-50 rounded-xl border border-amber-200">
-                <div className="px-4 py-3 border-b border-amber-100 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  <h3 className="text-sm font-semibold text-amber-800">Original Enquiry Email</h3>
-                </div>
-                <div className="px-4 py-3 space-y-2">
-                  {srcEmail && (
-                    <p className="text-xs text-amber-700"><span className="font-semibold">From:</span> {srcEmail}</p>
-                  )}
-                  {message ? (
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{message}</p>
-                  ) : (
-                    <p className="text-xs text-amber-600 italic">No message body extracted</p>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
 
           {/* Notes */}
           <div className="bg-white rounded-xl border border-gray-200">

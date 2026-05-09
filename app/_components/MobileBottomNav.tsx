@@ -83,7 +83,7 @@ export default function MobileBottomNav() {
         }}
       >
         <div className="flex items-center justify-between px-5 pt-4 pb-2">
-          <p style={{ fontSize: 13, fontWeight: 700, color: "#1A1D23" }}>All Tools</p>
+          <p style={{ fontSize: 13, fontWeight: 700, color: "#1A1D23" }}>Menu</p>
           <button
             onClick={() => setOpen(false)}
             style={{ background: "#F3F4F6", border: "none", borderRadius: 99, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
