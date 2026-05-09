@@ -19,19 +19,15 @@ const PRIMARY_NAV = [
   { label: "Dashboard",    href: "/dashboard"    },
   { label: "Leads",        href: "/leads"        },
   { label: "Properties",   href: "/properties"   },
-  { label: "Tasks",        href: "/tasks"        },
 ];
 
 const MORE_NAV = [
-  { label: "Auto Capture ⚡",   href: "/auto-capture"  },
-  { label: "Action Plans",      href: "/action-plans"  },
-  { label: "Site Visits",       href: "/visits"        },
-  { label: "Commission",        href: "/deals"         },
-  { label: "Clients",           href: "/clients"       },
-  { label: "Property Links",    href: "/secure-share"  },
-  { label: "Newspaper Leads",   href: "/newspaper"     },
-  { label: "Msg Templates",     href: "/ai-tools"      },
-  { label: "Reports",           href: "/analytics"     },
+  { label: "Auto Capture ⚡", href: "/auto-capture"  },
+  { label: "Site Visits",     href: "/visits"        },
+  { label: "Commission",      href: "/deals"         },
+  { label: "Property Links",  href: "/secure-share"  },
+  { label: "Newspaper Leads", href: "/newspaper"     },
+  { label: "Reports",         href: "/analytics"     },
 ];
 
 export default function TopNav() {

@@ -14,7 +14,6 @@ import type { Plan } from "@/lib/plans";
 const coreItems = [
   { label: "Dashboard",    href: "/dashboard",    icon: DashboardIcon },
   { label: "Leads",        href: "/leads",        icon: LeadsIcon     },
-  { label: "Tasks",        href: "/tasks",        icon: TasksIcon     },
   { label: "Auto Capture", href: "/auto-capture", icon: CaptureIcon   },
 ];
 
@@ -23,10 +22,8 @@ const toolItems = [
   { label: "Properties",     href: "/properties",   icon: BuildingIcon, requires: undefined    },
   { label: "Site Visits",    href: "/visits",       icon: CalendarIcon, requires: "starter" as Plan },
   { label: "Commission",     href: "/deals",        icon: CoinIcon,     requires: "pro"     as Plan },
-  { label: "Clients",        href: "/clients",      icon: ClientIcon,   requires: undefined    },
   { label: "Property Links", href: "/secure-share", icon: LinkIcon,     requires: "starter" as Plan },
   { label: "Newspaper Leads",href: "/newspaper",    icon: NewsIcon,     requires: "starter" as Plan },
-  { label: "Msg Templates",  href: "/ai-tools",     icon: MsgIcon,      requires: "starter" as Plan },
   { label: "Reports",        href: "/analytics",    icon: ChartIcon,    requires: "pro"     as Plan },
 ];
 

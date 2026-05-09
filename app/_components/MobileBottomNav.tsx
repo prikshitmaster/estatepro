@@ -8,21 +8,17 @@ import { usePathname } from "next/navigation";
 const mainTabs = [
   { label: "Home",       href: "/dashboard",    icon: HomeIcon    },
   { label: "Leads",      href: "/leads",        icon: UsersIcon   },
-  { label: "Tasks",      href: "/tasks",        icon: TasksIcon   },
   { label: "Properties", href: "/properties",   icon: BuildingIcon},
 ];
 
 const moreItems = [
-  { label: "Auto Capture",     href: "/auto-capture", icon: CaptureIcon   },
-  { label: "Action Plans",     href: "/action-plans", icon: ActionPlanIcon},
-  { label: "Site Visits",      href: "/visits",       icon: CalendarIcon  },
-  { label: "Commission",       href: "/deals",        icon: CoinIcon      },
-  { label: "Clients",          href: "/clients",      icon: ClientIcon    },
-  { label: "Property Links",   href: "/secure-share", icon: LinkIcon      },
-  { label: "Newspaper Leads",  href: "/newspaper",    icon: NewsIcon      },
-  { label: "Message Templates",href: "/ai-tools",     icon: MsgIcon       },
-  { label: "Reports",          href: "/analytics",    icon: ChartIcon     },
-  { label: "Settings",         href: "/settings",     icon: SettingsIcon  },
+  { label: "Auto Capture",   href: "/auto-capture", icon: CaptureIcon   },
+  { label: "Site Visits",    href: "/visits",       icon: CalendarIcon  },
+  { label: "Commission",     href: "/deals",        icon: CoinIcon      },
+  { label: "Property Links", href: "/secure-share", icon: LinkIcon      },
+  { label: "Newspaper Leads",href: "/newspaper",    icon: NewsIcon      },
+  { label: "Reports",        href: "/analytics",    icon: ChartIcon     },
+  { label: "Settings",       href: "/settings",     icon: SettingsIcon  },
 ];
 
 export default function MobileBottomNav() {
