@@ -156,10 +156,19 @@ export default function LeadDetailPage({ params }: Props) {
       const data = await getLeadById(id);
       if (!data) { setNotFound(true); setLoading(false); return; }
       setLead(data);
-      // Strip auto-captured metadata lines from notes textarea display
+      // Strip auto-captured metadata and AI-generated lines from notes textarea
       const cleanNotes = (data.notes ?? "")
         .split("\n")
-        .filter((l) => !l.startsWith("Message:") && !l.startsWith("Source email:"))
+        .filter((l) => {
+          if (l.startsWith("Message:"))              return false;
+          if (l.startsWith("Source email:"))         return false;
+          if (l.startsWith("⚠️"))                   return false;
+          if (l.startsWith("💡"))                    return false;
+          if (l.startsWith("• "))                    return false;
+          if (l.includes("Suggest these active"))    return false;
+          if (l.includes("May have enquired"))       return false;
+          return true;
+        })
         .join("\n")
         .trim();
       setNotes(cleanNotes);

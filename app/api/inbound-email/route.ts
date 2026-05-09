@@ -187,16 +187,7 @@ export async function POST(req: NextRequest) {
     const soldCheck = await checkSoldProperty(userId, {
       location: parsedLocation, property_interest: parsedPropertyInterest, budget_max: parsedBudgetMax,
     });
-    let finalNotes  = parsedMessage ? `Message: ${parsedMessage}` : "";
-
-    if (soldCheck) {
-      const { matched, alternatives } = soldCheck;
-      finalNotes += `\n\n⚠️ May have enquired on ${matched.status} property: "${matched.title}"`;
-      if (alternatives.length) {
-        finalNotes += `\n💡 Suggest these active listings:\n` +
-          alternatives.map(a => `• ${a.title} — ${a.location}`).join("\n");
-      }
-    }
+    const finalNotes = parsedMessage ? `Message: ${parsedMessage}` : "";
 
     // ── 6. Insert lead ───────────────────────────────────────────────────────
     const defaultName = parsedName || parsedEmail
