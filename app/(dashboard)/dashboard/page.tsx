@@ -206,7 +206,7 @@ export default function DashboardPage() {
                                 style={{ background: "#1BC47D" }}>
                                 Call
                               </a>
-                              <a href={`https://wa.me/91${lead.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer"
+                              <a href={`https://wa.me/91${(lead.phone ?? "").replace(/\D/g, "")}`} target="_blank" rel="noreferrer"
                                 className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-white"
                                 style={{ background: "#25D366" }}>
                                 WhatsApp

@@ -640,7 +640,7 @@ function LeadMatchCard({
           Call Now
         </a>
         <a
-          href={`https://wa.me/91${lead.phone.replace(/\D/g, "")}?text=${waMsg}`}
+          href={`https://wa.me/91${(lead.phone ?? "").replace(/\D/g, "")}?text=${waMsg}`}
           target="_blank" rel="noopener noreferrer"
           className="flex-1 py-2.5 text-center text-xs font-semibold text-white flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
           style={{ background: "#25D366" }}

@@ -64,7 +64,7 @@ export default function NewLeadPage() {
     try {
       const leads = await getAllLeads();
       const norm = phone.replace(/\D/g, "");
-      const match = leads.find((l) => l.phone.replace(/\D/g, "") === norm);
+      const match = leads.find((l) => (l.phone ?? "").replace(/\D/g, "") === norm);
       setDuplicate(match ? { id: match.id, name: match.name, phone: match.phone } : null);
     } catch {}
   }
