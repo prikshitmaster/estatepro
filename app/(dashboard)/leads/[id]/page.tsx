@@ -394,7 +394,7 @@ export default function LeadDetailPage({ params }: Props) {
           Call
         </a>
 
-        <a href={`https://wa.me/91${lead.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer"
+        <a href={`https://wa.me/91${(lead.phone ?? "").replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer"
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-90"
           style={{ background: "#25D366", color: "#fff" }}>
           <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
@@ -959,7 +959,7 @@ function PropertyMatchCard({ prop, lead, tier, diff = 0 }: {
           className="flex-1 py-2 text-center text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors border-r border-gray-100">
           View
         </Link>
-        <a href={`https://wa.me/91${lead.phone.replace(/\D/g, "")}?text=${waMsg}`}
+        <a href={`https://wa.me/91${(lead.phone ?? "").replace(/\D/g, "")}?text=${waMsg}`}
           target="_blank" rel="noopener noreferrer"
           className="flex-1 py-2 text-center text-xs font-semibold text-white hover:opacity-90 transition-opacity"
           style={{ background: "#25D366" }}>

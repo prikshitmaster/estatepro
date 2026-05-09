@@ -725,7 +725,7 @@ export default function LeadsPage() {
                             style={{ background: "#1BC47D" }}>
                             Call
                           </a>
-                          <a href={`https://wa.me/91${lead.phone.replace(/\D/g,"")}`}
+                          <a href={`https://wa.me/91${(lead.phone ?? "").replace(/\D/g,"")}`}
                             target="_blank" rel="noreferrer"
                             className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-white transition-opacity hover:opacity-90"
                             style={{ background: "#25D366" }}>
