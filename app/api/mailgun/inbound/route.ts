@@ -98,8 +98,9 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    if (!parsed.phone && !parsed.email && !parsed.name) {
-      return NextResponse.json({ skipped: true, reason: "No contact info found" });
+    // Must have at least a phone OR email to be worth saving
+    if (!parsed.phone && !parsed.email) {
+      return NextResponse.json({ skipped: true, reason: "No phone or email found" });
     }
 
     // ── 5. Deduplicate by phone, then email ───────────────────────────────────
