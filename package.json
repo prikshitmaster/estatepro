@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "cap:add:android": "cap add android",
+    "cap:assets": "capacitor-assets generate --android",
+    "cap:sync": "cap sync android"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
@@ -19,6 +22,10 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

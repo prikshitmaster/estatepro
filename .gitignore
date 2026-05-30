@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# capacitor — the native Android project is generated fresh by `npx cap add
+# android` (locally or in CI), so we don't commit it. The source of truth is
+# capacitor.config.ts + mobile-shell/ + assets/.
+/android
+/ios

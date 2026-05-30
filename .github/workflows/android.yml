@@ -1,0 +1,73 @@
+# .github/workflows/android.yml
+#
+# 🧠 WHAT THIS FILE DOES (plain English):
+# This is the robot that builds the RatePerFeet Android app (the .apk file you
+# install on a phone) up in the cloud — you do NOT need Android Studio on your
+# computer.
+#
+# WHEN IT RUNS:
+#   • Automatically whenever the app's settings/icon change on the main branch.
+#   • Any time you click "Run workflow" on the GitHub → Actions tab.
+#
+# WHAT YOU GET:
+#   When it finishes, open the run on the Actions tab and scroll to "Artifacts".
+#   Download "RatePerFeet-debug-apk", unzip it, and you'll have app-debug.apk.
+#   Copy that to an Android phone and tap it to install (allow "install from
+#   unknown sources" the first time). The app just opens https://rateperfeet.com.
+
+name: Build Android APK
+
+on:
+  workflow_dispatch: {} # the manual "Run workflow" button
+  push:
+    branches: [main]
+    paths: # only rebuild when something that affects the app changes
+      - "capacitor.config.ts"
+      - "mobile-shell/**"
+      - "assets/**"
+      - "package.json"
+      - ".github/workflows/android.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # GitHub's free Linux machine (has the Android SDK)
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create the native Android project
+        run: npx cap add android
+
+      - name: Generate app icon and splash screen
+        run: npx capacitor-assets generate --android
+
+      - name: Sync Capacitor config into the project
+        run: npx cap sync android
+
+      - name: Build the debug APK
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload the APK so you can download it
+        uses: actions/upload-artifact@v4
+        with:
+          name: RatePerFeet-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

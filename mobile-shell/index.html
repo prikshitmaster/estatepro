@@ -1,0 +1,68 @@
+<!doctype html>
+<!--
+  mobile-shell/index.html
+
+  🧠 WHAT THIS FILE DOES (plain English):
+  This page is ONLY shown inside the RatePerFeet phone app when the phone has
+  no internet (or our website can't be reached). Normally the app loads the
+  live site https://rateperfeet.com and never shows this. It's a friendly
+  "you're offline" screen with a Retry button.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>RatePerFeet</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body {
+        height: 100%;
+        font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+        background: #1bc47d;
+        color: #fff;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px calc(24px + env(safe-area-inset-right))
+                 calc(24px + env(safe-area-inset-bottom))
+                 calc(24px + env(safe-area-inset-left));
+      }
+      .badge {
+        width: 76px; height: 76px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.18);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 38px; font-weight: 800;
+        margin-bottom: 20px;
+      }
+      h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+      p { font-size: 14px; opacity: 0.9; max-width: 280px; line-height: 1.5; }
+      button {
+        margin-top: 24px;
+        background: #fff; color: #0f9d63;
+        border: none; border-radius: 14px;
+        padding: 13px 28px;
+        font-size: 15px; font-weight: 700;
+        font-family: inherit;
+      }
+      button:active { transform: scale(0.97); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="badge">🏠</div>
+      <h1>RatePerFeet</h1>
+      <p>You appear to be offline. Check your internet connection, then tap retry to reopen your CRM.</p>
+      <button onclick="location.href='https://rateperfeet.com'">Retry</button>
+    </div>
+  </body>
+</html>
