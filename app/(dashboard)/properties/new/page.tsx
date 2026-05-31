@@ -64,6 +64,9 @@ export default function NewPropertyPage() {
         possession:       values.possession,
         amenities:        values.amenities.length > 0 ? values.amenities : undefined,
         description:      values.description,
+        owner_name:       values.owner_name,
+        owner_phone:      values.owner_phone,
+        listed_by:        values.listed_by,
       });
 
       // Go to detail page so background video compression can start

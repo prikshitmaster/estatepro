@@ -45,3 +45,6 @@ next-env.d.ts
 # capacitor.config.ts + mobile-shell/ + assets/.
 /android
 /ios
+
+# Supabase CLI local link state
+supabase/.temp/

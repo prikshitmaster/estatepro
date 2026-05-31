@@ -50,6 +50,10 @@ export interface Property {
   possession?:   string;      // "Ready to Move" / "Under Construction"
   amenities?:    string[];    // ["Gym", "Pool", ...]
   description?:  string;      // free-text
+  // ── Owner / seller contact — who to call about this property ───────────────
+  owner_name?:   string;      // e.g. "Mr. Sharma"
+  owner_phone?:  string;      // the number to call/WhatsApp
+  listed_by?:    "owner" | "broker" | "builder"; // who this contact is (default owner)
   created_at?: string;
 }
 

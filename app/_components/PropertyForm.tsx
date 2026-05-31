@@ -33,9 +33,19 @@ export interface PropertyFormValues {
   possession?:  string;
   amenities:    string[];
   description?: string;
+  owner_name?:  string;
+  owner_phone?: string;
+  listed_by?:   "owner" | "broker" | "builder";
   mediaFiles:   File[];
   keptUrls:     string[];
 }
+
+// Who the owner-contact is — used by the "Listed by" picker
+const LISTED_BY_OPTIONS: { value: "owner" | "broker" | "builder"; label: string }[] = [
+  { value: "owner",   label: "Owner"   },
+  { value: "broker",  label: "Broker"  },
+  { value: "builder", label: "Builder" },
+];
 
 interface Props {
   initialData?:  Property;           // pass for edit mode, omit for new
@@ -85,6 +95,11 @@ export default function PropertyForm({
   const [amenities,    setAmenities]    = useState<string[]>(initialData?.amenities ?? []);
   const [description,  setDescription]  = useState(initialData?.description  ?? "");
 
+  // Owner / contact — who to call about this property
+  const [ownerName,  setOwnerName]  = useState(initialData?.owner_name  ?? "");
+  const [ownerPhone, setOwnerPhone] = useState(initialData?.owner_phone ?? "");
+  const [listedBy,   setListedBy]   = useState<"owner" | "broker" | "builder">(initialData?.listed_by ?? "owner");
+
   // Media
   const existingRaw = initialData
     ? [...new Set([initialData.image_url, ...(initialData.media_urls ?? [])].filter((u): u is string => !!u))]
@@ -125,6 +140,11 @@ export default function PropertyForm({
         possession:   possession  || undefined,
         amenities,
         description:  description.trim() || undefined,
+        // Only send owner fields when there's actually a contact — keeps saves
+        // unchanged (and safe) for properties with no owner info.
+        owner_name:   ownerName.trim()  || undefined,
+        owner_phone:  ownerPhone.trim() || undefined,
+        listed_by:    (ownerName.trim() || ownerPhone.trim()) ? listedBy : undefined,
         mediaFiles,
         keptUrls,
       });
@@ -210,6 +230,39 @@ export default function PropertyForm({
             e.g. type 3500000 → shows ₹35,00,000 (35 Lakh)
           </p>
         )}
+      </Card>
+
+      {/* ── Owner / Contact ── */}
+      {/* Who to call about this property — turns a match into an actionable lead */}
+      <Card>
+        <SectionLabel>Owner / Contact <Opt /></SectionLabel>
+        <div className="space-y-3 mt-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Owner name</Label>
+              <input
+                type="text" value={ownerName} onChange={(e) => setOwnerName(e.target.value)}
+                placeholder="e.g. Mr. Sharma" className={inp}
+              />
+            </div>
+            <div>
+              <Label>Owner phone</Label>
+              <input
+                type="tel" value={ownerPhone} onChange={(e) => setOwnerPhone(e.target.value)}
+                placeholder="98XXXXXXXX" className={inp}
+              />
+            </div>
+          </div>
+          <div>
+            <Label>Listed by</Label>
+            <div className="flex gap-2 mt-1 flex-wrap">
+              {LISTED_BY_OPTIONS.map((opt) => (
+                <Pill key={opt.value} label={opt.label} selected={listedBy === opt.value}
+                  onClick={() => setListedBy(opt.value)} />
+              ))}
+            </div>
+          </div>
+        </div>
       </Card>
 
       {/* ── Property Details ── */}
