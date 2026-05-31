@@ -20,8 +20,13 @@ export async function getUserPlan(): Promise<Plan> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return "free";
 
-  // A real (paid) subscription always wins — this is how billing works once you
-  // start selling plans. maybeSingle() returns null (no error) when there's no row.
+  // Pre-launch: EVERYONE gets full access, no expiry — and this overrides any
+  // old/test subscription row in the DB (e.g. a leftover "starter" plan). We
+  // don't even read the subscriptions table while the trial is on.
+  if (TRIAL_FULL_ACCESS) return TRIAL_PLAN;
+
+  // ── Billing live (TRIAL_FULL_ACCESS = false) ────────────────────────────────
+  // A real (paid) subscription wins. maybeSingle() returns null when no row.
   const { data } = await supabase
     .from("subscriptions")
     .select("plan, status, expires_at")
@@ -36,11 +41,7 @@ export async function getUserPlan(): Promise<Plan> {
 
   if (hasPaidPlan) return data!.plan as Plan;
 
-  // No paid plan → free trial.
-  // Pre-launch: everyone gets full access, no expiry.
-  if (TRIAL_FULL_ACCESS) return TRIAL_PLAN;
-
-  // (Enabled later) time-boxed trial measured from the signup date.
+  // No paid plan → time-boxed trial measured from the signup date.
   const daysOld = (Date.now() - new Date(user.created_at).getTime()) / 86400000;
   return daysOld <= TRIAL_DAYS ? TRIAL_PLAN : "free";
 }
