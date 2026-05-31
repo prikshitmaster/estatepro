@@ -144,9 +144,9 @@ export default function Sidebar() {
           );
         })}
 
-        {/* Upgrade banner */}
+        {/* Free trial banner (paid plans not selling yet) */}
         <Link
-          href="/upgrade"
+          href="/settings/billing"
           className="flex items-center gap-2 rounded-xl mt-4 mx-0"
           style={{
             padding: "10px 11px",
@@ -155,10 +155,10 @@ export default function Sidebar() {
             textDecoration: "none",
           }}
         >
-          <span style={{ fontSize: 14 }}>⚡</span>
+          <span style={{ fontSize: 14 }}>🎉</span>
           <div className="min-w-0 flex-1">
-            <p style={{ fontSize: 11.5, fontWeight: 700, color: "#E5E7EB" }}>Upgrade Plan</p>
-            <p style={{ fontSize: 10, color: "#6B7280" }}>Starter · Pro · Team</p>
+            <p style={{ fontSize: 11.5, fontWeight: 700, color: "#E5E7EB" }}>Free Trial</p>
+            <p style={{ fontSize: 10, color: "#6B7280" }}>Full access · all features</p>
           </div>
         </Link>
 
