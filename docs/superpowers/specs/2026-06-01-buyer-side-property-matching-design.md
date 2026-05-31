@@ -1,7 +1,7 @@
 # Buy-Side Property Matching — Design Spec
 
 **Date:** 2026-06-01
-**Status:** Approved (ready for implementation plan)
+**Status:** ✅ Implemented & shipped (all 5 parts; production build passes)
 **App:** EstatePro / RatePerFeet CRM (Next.js 16 + Supabase, Indian real estate brokers)
 
 ## Problem
