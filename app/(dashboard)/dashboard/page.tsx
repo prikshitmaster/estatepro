@@ -74,7 +74,7 @@ export default function DashboardPage() {
     if (!user) return;
     const { data, error } = await supabase
       .from("activity_logs")
-      .select("id, type, note, lead_id, created_at, leads(name)")
+      .select("id, type, content, lead_id, created_at, leads(name)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(20);
@@ -101,7 +101,7 @@ export default function DashboardPage() {
       type: row.type as ActivityEvent["type"],
       lead_id: row.lead_id,
       lead_name: (row.leads as unknown as { name: string } | null)?.name ?? "",
-      note: row.note ?? "",
+      note: row.content ?? "",
       created_at: row.created_at,
     }));
     const merged = [...leadEvents, ...logEvents]
