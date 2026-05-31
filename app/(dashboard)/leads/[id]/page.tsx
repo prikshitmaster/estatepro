@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getLeadById, updateLead, deleteLead } from "@/lib/db/leads";
 import { getAllProperties } from "@/lib/db/properties";
+import { getAllNewspaperLeads } from "@/lib/db/newspaper-leads";
 import { addTask, deleteTask } from "@/lib/db/tasks";
+import BuyerRequirements from "@/app/_components/BuyerRequirements";
 import { formatPrice } from "@/lib/mock-data";
-import { Lead, LeadStage, LeadSource, Property, Task, TaskType } from "@/lib/types";
+import { Lead, LeadStage, LeadSource, Property, NewspaperLead, Task, TaskType } from "@/lib/types";
 import { matchPropertiesToLead, budgetDiff, MatchResult } from "@/lib/match-utils";
 import { logActivity, getLeadActivity, ActivityLog, ActivityType, ACTIVITY_ICON, ACTIVITY_COLOR } from "@/lib/db/activity-logs";
 import { getLeadTags, getAllTags, addTagToLead, removeTagFromLead, createTag, Tag, TAG_COLORS } from "@/lib/db/tags";
@@ -136,6 +138,8 @@ export default function LeadDetailPage({ params }: Props) {
   const [notes,              setNotes]              = useState("");
   const [matchedProperties,  setMatchedProperties]  = useState<MatchResult<Property>>({ perfect: [], close: [] });
   const [allProperties,      setAllProperties]      = useState<Property[]>([]);
+  const [newspaperLeads,     setNewspaperLeads]     = useState<NewspaperLead[]>([]);
+  const [userId,             setUserId]             = useState("");
   const [stageOpen,          setStageOpen]          = useState(false);
   const [sourceOpen,         setSourceOpen]         = useState(false);
 
@@ -203,6 +207,7 @@ export default function LeadDetailPage({ params }: Props) {
       import("@/lib/supabase").then(({ supabase }) =>
         supabase.auth.getUser().then(({ data: { user } }) => {
           if (!user) return;
+          setUserId(user.id);
           const plans = (user.user_metadata?.action_plans ?? []) as ActionPlanLite[];
           setActionPlans(plans.map((p) => ({ id: p.id, name: p.name, steps: p.steps ?? [] })));
           const assigned = (user.user_metadata?.lead_plans ?? {}) as Record<string, string>;
@@ -215,6 +220,9 @@ export default function LeadDetailPage({ params }: Props) {
         setAllProperties(props);
         setMatchedProperties(matchPropertiesToLead(data, props));
       }).catch(() => {});
+
+      // Load the newspaper market pool (for buy-side requirement matching)
+      getAllNewspaperLeads().then(setNewspaperLeads).catch(() => {});
     }
     load();
   }, []); // eslint-disable-line
@@ -982,6 +990,14 @@ export default function LeadDetailPage({ params }: Props) {
               )}
             </div>
           </div>
+
+          {/* Buyer Requirements — buy-side matches (own listings + market) */}
+          <BuyerRequirements
+            lead={lead}
+            userId={userId}
+            properties={allProperties}
+            newspaperLeads={newspaperLeads}
+          />
 
           {/* Action Plan */}
           {actionPlans.length > 0 && (

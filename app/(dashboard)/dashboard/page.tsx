@@ -5,6 +5,10 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getAllLeads, getDashboardStats } from "@/lib/db/leads";
 import { getAllTasks } from "@/lib/db/tasks";
+import { getAllProperties } from "@/lib/db/properties";
+import { getAllNewspaperLeads } from "@/lib/db/newspaper-leads";
+import { getActiveRequirements } from "@/lib/db/buyer-requirements";
+import { getBuyerMatches, totalMatches } from "@/lib/buyer-matches";
 import { formatPrice, initials, STAGE_LABEL } from "@/lib/mock-data";
 import { Lead, LeadStage, Task } from "@/lib/types";
 
@@ -46,6 +50,7 @@ export default function DashboardPage() {
   const [allLeads,     setAllLeads]     = useState<Lead[]>([]);
   const [activity,     setActivity]     = useState<ActivityEvent[]>([]);
   const [activityOk,   setActivityOk]   = useState<boolean | null>(null); // null = loading
+  const [buyersToMatch, setBuyersToMatch] = useState<{ leadId: string; name: string; count: number }[]>([]);
 
   const todayStr = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
 
@@ -56,7 +61,29 @@ export default function DashboardPage() {
     });
     load();
     loadActivity();
+    loadBuyersToMatch();
   }, []);
+
+  // ── Buy-side: which buyers have callable property matches right now ──────────
+  async function loadBuyersToMatch() {
+    try {
+      const [reqs, props, papers, leads] = await Promise.all([
+        getActiveRequirements(), getAllProperties(), getAllNewspaperLeads(), getAllLeads(),
+      ]);
+      const nameById = new Map(leads.map((l) => [l.id, l.name]));
+      // Sum matches per buyer (lead), keep only buyers with ≥1 match
+      const byLead = new Map<string, { leadId: string; name: string; count: number }>();
+      for (const r of reqs) {
+        if (!r.lead_id) continue;
+        const count = totalMatches(getBuyerMatches(r, props, papers));
+        if (count === 0) continue;
+        const row = byLead.get(r.lead_id);
+        if (row) row.count += count;
+        else byLead.set(r.lead_id, { leadId: r.lead_id, name: nameById.get(r.lead_id) ?? r.label ?? "Buyer", count });
+      }
+      setBuyersToMatch([...byLead.values()].sort((a, b) => b.count - a.count).slice(0, 6));
+    } catch { /* tables may not exist yet */ }
+  }
 
   async function load() {
     try {
@@ -302,6 +329,36 @@ export default function DashboardPage() {
                 </div>
                 <div className="px-4 py-2.5" style={{ borderTop: "1px solid #FCD34D" }}>
                   <Link href="/leads" className="text-xs font-semibold text-amber-700">View in Leads →</Link>
+                </div>
+              </div>
+            )}
+
+            {/* Buyers to match — buy-side requirement matches */}
+            {buyersToMatch.length > 0 && (
+              <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #E5E7EB" }}>
+                <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                  <span className="text-sm">🔑</span>
+                  <p className="text-sm font-semibold text-gray-800">Buyers to match</p>
+                  <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#D1FAE5", color: "#065F46" }}>
+                    {buyersToMatch.length}
+                  </span>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {buyersToMatch.map((b) => (
+                    <Link key={b.leadId} href={`/leads/${b.leadId}`}
+                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0" style={{ background: "#1BC47D" }}>
+                        {initials(b.name)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{b.name}</p>
+                        <p className="text-xs text-gray-400">{b.count} propert{b.count !== 1 ? "ies" : "y"} to call</p>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: "#F0FDF9", color: "#15803D" }}>
+                        {b.count}
+                      </span>
+                    </Link>
+                  ))}
                 </div>
               </div>
             )}

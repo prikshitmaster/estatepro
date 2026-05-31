@@ -156,6 +156,26 @@ export interface Task {
   created_at?: string;
 }
 
+// ── Buyer Requirement types ───────────────────────────────────────────────────
+// A saved "what this client wants to buy" brief, created from a buyer lead.
+// One lead can have several. This is what buy-side matching runs on.
+
+export type RequirementStatus = "active" | "fulfilled" | "archived";
+
+export interface BuyerRequirement {
+  id: string;
+  user_id: string;
+  lead_id?: string | null;        // the buyer person this is for
+  label?: string;                 // e.g. "Rahul — 2BHK Andheri"
+  budget_min: number;
+  budget_max: number;
+  location?: string;
+  property_interest?: string;     // "2BHK", "Villa", "Plot"…
+  status: RequirementStatus;
+  notes?: string;
+  created_at?: string;
+}
+
 // ─── Secure Share types ───────────────────────────────────────────────────────
 
 export type ShareMediaType = "image" | "pdf" | "word" | "excel" | "video";
