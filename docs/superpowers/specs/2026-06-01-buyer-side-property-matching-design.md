@@ -27,6 +27,8 @@ each showing **who to call**.
 
 ## Non-Goals (YAGNI — explicitly deferred)
 
+- **Standalone requirements** (not attached to a lead) + a dedicated Requirements
+  nav screen. Requirements are created **from a buyer lead only** for now.
 - Linking properties to the `clients` table (richer owner relationship). Later.
 - WhatsApp/email push or background match jobs. Matches are computed on page load.
 - "New since last visit" / seen-unseen tracking. Dashboard shows current matches only.
@@ -34,7 +36,8 @@ each showing **who to call**.
 
 ## Design
 
-Four parts. The only schema change is three columns on `properties`.
+Five parts. Schema changes: three columns on `properties` + one new
+`buyer_requirements` table.
 
 ### Part 1 — Owner contact on a property (the foundation)
 
@@ -54,7 +57,39 @@ already uses (`phone` + `owner_type`), so one matching engine works across both 
 - **Property detail** (`app/(dashboard)/properties/[id]/page.tsx`): show **Call owner**
   (`tel:`) and **WhatsApp owner** (`wa.me`) buttons when `owner_phone` is present.
 
-### Part 2 — Matching looks at the market too
+### Part 2 — Buyer requirements as a DB record
+
+A buyer requirement is a first-class row (not just the lead's fields), so one buyer
+can have several and each has its own status.
+
+- **DB migration** (`supabase/buyer-requirements-migration.sql`):
+  ```sql
+  CREATE TABLE IF NOT EXISTS buyer_requirements (
+    id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id   uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    lead_id   uuid REFERENCES leads(id) ON DELETE SET NULL,  -- the buyer person
+    label     text,
+    budget_min bigint DEFAULT 0,
+    budget_max bigint DEFAULT 0,
+    location   text,
+    property_interest text,        -- "2BHK", "Villa", "Plot"…
+    status    text DEFAULT 'active' CHECK (status IN ('active','fulfilled','archived')),
+    notes     text,
+    created_at timestamptz DEFAULT now()
+  );
+  ALTER TABLE buyer_requirements ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "own requirements" ON buyer_requirements FOR ALL
+    USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+  ```
+- **Type** (`lib/types.ts`): `BuyerRequirement`.
+- **DB layer** (`lib/db/buyer-requirements.ts`): `getRequirementsForLead`, `getActiveRequirements`,
+  `addRequirement`, `updateRequirement`, `deleteRequirement`.
+- **Created from a buyer lead only** (no standalone screen yet): the lead page has a
+  "Buyer Requirements" section where the broker adds one or more, pre-filled from the
+  lead's `budget_min/max`, `location`, `property_interest`. Editable; status can be set
+  to `fulfilled`/`archived`.
+
+### Part 3 — Matching looks at the market too
 
 - New adapter in `lib/match-utils.ts` (or a small `lib/buyer-matches.ts`):
   map a `NewspaperLead` (sale intent, active) → the minimal shape the matcher needs
@@ -75,35 +110,39 @@ already uses (`phone` + `owner_type`), so one matching engine works across both 
     href?: string;               // link to /properties/[id] for own listings
   }
   ```
-- A function `getBuyerMatches(lead, properties, newspaperLeads): { perfect, close }`
-  returning `PropertyMatch[]`, reusing the existing budget/location/type rules.
+- A function `getBuyerMatches(requirement, properties, newspaperLeads): { perfect, close }`
+  returning `PropertyMatch[]`, reusing the existing budget/location/type rules. The
+  `requirement` supplies `budget_min/max`, `location`, `property_interest` — the same
+  shape the matcher already consumes from a lead.
 
-### Part 3 — On the lead (buyer) page
+### Part 4 — On the lead (buyer) page
 
-- Extend the existing "Matching Properties" section in
-  `app/(dashboard)/leads/[id]/page.tsx` to render `PropertyMatch[]` from both sources.
-- Each item: title · price · location · a **"Your listing" / "From market"** tag · and
-  a **Call / WhatsApp owner** button when `contactPhone` exists. Own listings also link
-  to the property detail page.
+- A **"Buyer Requirements"** section in `app/(dashboard)/leads/[id]/page.tsx`: list this
+  lead's requirements (Part 2), add/edit, mark fulfilled.
+- Under each `active` requirement, render its `PropertyMatch[]` from both sources.
+- Each match item: title · price · location · a **"Your listing" / "From market"** tag ·
+  and a **Call / WhatsApp owner** button when `contactPhone` exists. Own listings also
+  link to the property detail page.
 
-### Part 4 — Dashboard "Buyers to match" (the in-app alert)
+### Part 5 — Dashboard "Buyers to match" (the in-app alert)
 
-- New section on `app/(dashboard)/dashboard/page.tsx`: list active buyer leads
-  (`stage` not closed/lost) that have **≥1 callable match right now**, with the match
-  count; click → the lead. Computed live from the leads + properties + newspaper pools
-  already loaded (no new query pattern, no job).
+- New section on `app/(dashboard)/dashboard/page.tsx`: list **active buyer requirements**
+  that have **≥1 callable match right now**, grouped by buyer (lead), with the match
+  count; click → the lead. Computed live from the requirements + properties + newspaper
+  pools already loaded (no new query pattern, no job).
 
 ## Data Flow
 
 ```
-Lead (buyer requirement)
-        │
-        ▼
-getBuyerMatches(lead, ownProperties, newspaperLeads)
-        │  reuse budget/location/type rules (match-utils)
-        ▼
-PropertyMatch[]  ──►  Lead page  : "Matching Properties" + Call owner
-                 └─►  Dashboard  : "Buyers to match" section
+Lead (buyer person)
+   └─ BuyerRequirement(s)  [DB table, created from the lead]
+            │
+            ▼
+   getBuyerMatches(requirement, ownProperties, newspaperLeads)
+            │  reuse budget/location/type rules (match-utils)
+            ▼
+   PropertyMatch[]  ──►  Lead page  : requirement + matches + Call owner
+                    └─►  Dashboard  : "Buyers to match" (active requirements w/ matches)
 ```
 
 ## Error / Edge Handling
@@ -118,13 +157,17 @@ PropertyMatch[]  ──►  Lead page  : "Matching Properties" + Call owner
 
 - `getBuyerMatches` is a pure function → unit-test: own-only, market-only, mixed,
   perfect vs close tiers, sale-vs-rent filtering, missing-phone items.
-- Manual: add a property with owner phone → confirm Call button on detail; create a
-  buyer lead that matches → confirm it appears on the lead page and in the dashboard
-  "Buyers to match" section with a working Call button.
+- Manual: add a property with owner phone → confirm Call button on detail; on a buyer
+  lead, add a requirement that matches → confirm matches appear under it on the lead
+  page and in the dashboard "Buyers to match" section with a working Call button; mark
+  the requirement `fulfilled` → confirm it drops off the dashboard.
 
 ## Glossary (avoid confusing the customer)
 
-- **Lead** = a *person* who wants to buy; carries the requirement (budget/location/BHK).
+- **Lead** = a *person* who wants to buy. The lead's own budget/location/BHK still feed
+  the seller-side "which leads fit this property" view.
+- **Buyer requirement** = a saved buy-side brief (budget/location/BHK + status), created
+  from a lead. A lead can have several. This is what buy-side matching runs on.
 - **Property** = a *listing* (an asset). The broker's own. Now also carries an owner contact.
 - **Newspaper lead** = a *market property* from a newspaper/portal ad — someone else's,
   already callable (has a phone).
