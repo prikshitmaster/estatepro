@@ -59,6 +59,22 @@ jobs:
       - name: Sync Capacitor config into the project
         run: npx cap sync android
 
+      # ── Inject Android permissions into the manifest ──────────────────────────
+      # The android/ folder is freshly generated above so we patch it here.
+      # These permissions let the app ASK the user for:
+      #   POST_NOTIFICATIONS  → show notifications (Android 13+)
+      #   READ_CONTACTS       → import a phone contact into a lead
+      #   WRITE_CONTACTS      → save a lead to contacts
+      #   READ_MEDIA_IMAGES   → pick photos from gallery for property listings
+      #   READ_MEDIA_VIDEO    → pick videos from gallery
+      #   READ_EXTERNAL_STORAGE (≤ API 32 / Android 12) → same as above, older phones
+      - name: Add permissions to AndroidManifest.xml
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          sed -i 's|</manifest>|    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.READ_CONTACTS" />\n    <uses-permission android:name="android.permission.WRITE_CONTACTS" />\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n</manifest>|' $MANIFEST
+          echo "✅ Permissions added:"
+          grep "uses-permission" $MANIFEST
+
       - name: Build the debug APK
         run: |
           chmod +x android/gradlew
