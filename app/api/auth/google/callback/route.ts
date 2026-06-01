@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
     if (!tokens.refresh_token) {
       // No refresh token = user already approved before without revoking.
-      // They need to go to myaccount.google.com/permissions and remove EstatePro, then reconnect.
+      // They need to go to myaccount.google.com/permissions and remove RatePerFeet, then reconnect.
       return NextResponse.redirect(`${appUrl}/auto-capture?gmail_error=no_refresh_token`);
     }
 

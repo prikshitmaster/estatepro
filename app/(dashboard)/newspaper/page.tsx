@@ -66,7 +66,7 @@ function whatsappText(lead: NewspaperLead): string {
 💰 ${formatPrice(lead.price)} | ${lead.intent === "sale" ? "For Sale" : "For Rent"}${ownerLabel ? `\n👤 ${ownerLabel}` : ""}
 📞 ${lead.phone}${lead.description ? `\n📝 ${lead.description}` : ""}
 
-_Shared via EstatePro CRM_`;
+_Shared via RatePerFeet CRM_`;
 }
 
 // ─── City Distribution Chart ─────────────────────────────────────────────────

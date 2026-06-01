@@ -146,7 +146,7 @@ export default function TeamPage() {
         </Link>
         <div>
           <h1 className="text-xl font-bold text-gray-900">Team</h1>
-          <p className="text-sm text-gray-400">Invite agents and colleagues to EstatePro</p>
+          <p className="text-sm text-gray-400">Invite agents and colleagues to RatePerFeet</p>
         </div>
       </div>
 
@@ -156,7 +156,7 @@ export default function TeamPage() {
         <div className="space-y-3">
           {[
             { step: "1", title: "You enter their email and click Invite", desc: "We send them a sign-up link by email — no manual sharing needed." },
-            { step: "2", title: "They receive an email from EstatePro", desc: "The email has a button to set their password and create their account." },
+            { step: "2", title: "They receive an email from RatePerFeet", desc: "The email has a button to set their password and create their account." },
             { step: "3", title: "They sign in and start using the app", desc: "Each team member manages their own leads and data independently." },
           ].map(({ step, title, desc }) => (
             <div key={step} className="flex gap-3">
@@ -311,7 +311,7 @@ export default function TeamPage() {
               </svg>
               <span>
                 <strong>Invite sent!</strong> {inviteOk.replace("Invite sent to ", "").split(".")[0]} will receive
-                an email with a link to create their EstatePro account.
+                an email with a link to create their RatePerFeet account.
               </span>
             </div>
           )}

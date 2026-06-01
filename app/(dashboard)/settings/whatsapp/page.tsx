@@ -68,7 +68,7 @@ export default function WhatsAppSettingsPage() {
             messaging_product: "whatsapp",
             to: config.test_phone.replace(/\D/g, ""),
             type: "text",
-            text: { body: "EstatePro CRM: WhatsApp connection successful! ✅" },
+            text: { body: "RatePerFeet CRM: WhatsApp connection successful! ✅" },
           }),
         }
       );
@@ -96,7 +96,7 @@ export default function WhatsAppSettingsPage() {
         </Link>
         <div className="flex-1">
           <h1 className="text-xl font-bold text-gray-900">WhatsApp Business API</h1>
-          <p className="text-sm text-gray-400">Connect your business number to send messages directly from EstatePro</p>
+          <p className="text-sm text-gray-400">Connect your business number to send messages directly from RatePerFeet</p>
         </div>
         {/* Connection status badge */}
         <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${isConnected ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-400"}`}>

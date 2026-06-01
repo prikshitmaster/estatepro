@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     if (error) {
       if (error.message.toLowerCase().includes("already been registered")) {
         return NextResponse.json(
-          { error: "This email already has an EstatePro account. Ask them to log in directly." },
+          { error: "This email already has an RatePerFeet account. Ask them to log in directly." },
           { status: 400 }
         );
       }

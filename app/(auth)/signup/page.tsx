@@ -104,7 +104,7 @@ export default function SignupPage() {
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-4" style={{ background: '#1BC47D' }}>
             <span className="text-white font-bold text-xl">E</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">EstatePro CRM</h1>
+          <h1 className="text-2xl font-bold text-gray-900">RatePerFeet CRM</h1>
           <p className="text-gray-500 text-sm mt-1">Create your free account</p>
         </div>
 

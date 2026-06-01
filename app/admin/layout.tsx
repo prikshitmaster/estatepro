@@ -50,7 +50,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <span className="text-white font-bold text-sm">E</span>
           </div>
           <div>
-            <p className="text-sm font-bold text-gray-900">EstatePro Admin</p>
+            <p className="text-sm font-bold text-gray-900">RatePerFeet Admin</p>
             <p className="text-[10px] text-gray-400">Management Panel</p>
           </div>
         </div>

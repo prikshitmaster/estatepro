@@ -70,7 +70,7 @@ export default function TopNav() {
           .limit(10);
         if (error || !data) {
           const now = new Date().toISOString();
-          setNotifs([{ id: "1", title: "Welcome to EstatePro!", body: "Your CRM is ready. Add your first lead to get started.", read: false, created_at: now, type: "info" }]);
+          setNotifs([{ id: "1", title: "Welcome to RatePerFeet!", body: "Your CRM is ready. Add your first lead to get started.", read: false, created_at: now, type: "info" }]);
           setUnreadCount(1);
         } else {
           setNotifs(data as Notif[]);
@@ -118,12 +118,11 @@ export default function TopNav() {
     >
       {/* Logo */}
       <Link href="/dashboard" className="flex items-center gap-2 mr-6 shrink-0">
-        <div className="flex items-end gap-0.5">
-          <div style={{ width: 7, height: 16, borderRadius: 3, background: "#1BC47D" }} />
-          <div style={{ width: 7, height: 11, borderRadius: 3, background: "#1BC47D55" }} />
+        <div className="flex items-center justify-center rounded-lg shrink-0" style={{ width: 26, height: 26, background: "#1BC47D" }}>
+          <span style={{ fontSize: 10, fontWeight: 800, color: "#fff", letterSpacing: "-0.04em" }}>RPF</span>
         </div>
         <span style={{ fontSize: 15, fontWeight: 800, color: "#fff", letterSpacing: "-0.02em" }}>
-          EstatePro
+          RatePerFeet
         </span>
       </Link>
 

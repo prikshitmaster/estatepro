@@ -74,9 +74,9 @@ function greeting(lead: Lead, channel: Channel) {
 
 // Helper: sign-off changes based on channel
 function signoff(channel: Channel) {
-  if (channel === "email") return "\n\nBest regards,\n[Your Name]\nEstatePro";
+  if (channel === "email") return "\n\nBest regards,\n[Your Name]\nRatePerFeet";
   if (channel === "sms")   return " – [Your Name]";
-  return "\n\n– [Your Name], EstatePro";
+  return "\n\n– [Your Name], RatePerFeet";
 }
 
 // ── All templates, grouped by stage ──────────────────────────────────────────
@@ -139,7 +139,7 @@ const TEMPLATES: Record<LeadStage, TemplateFn[]> = {
       `${greeting(lead, ch)}\n\nThank you so much for trusting me with such an important decision. I hope your new ${lead.property_interest ?? "home"} brings you years of happiness.\n\nIf you know anyone looking for property in ${lead.location || "the area"}, I'd be grateful for the referral. Take care!${signoff(ch)}`,
 
     (lead, ch) =>
-      `${greeting(lead, ch)}\n\nIt's been a wonderful journey helping you find your ${lead.property_interest ?? "property"}! Enjoy settling in.\n\nRemember, I'm always just a message away for any future property needs. Thank you for choosing EstatePro!${signoff(ch)}`,
+      `${greeting(lead, ch)}\n\nIt's been a wonderful journey helping you find your ${lead.property_interest ?? "property"}! Enjoy settling in.\n\nRemember, I'm always just a message away for any future property needs. Thank you for choosing RatePerFeet!${signoff(ch)}`,
   ],
 
   // LOST — didn't close, trying to stay connected for the future

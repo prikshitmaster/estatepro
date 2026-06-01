@@ -7,7 +7,7 @@ import ViewerClient from "./ViewerClient";
 type Props = { params: Promise<{ token: string }> };
 
 const FALLBACK: Metadata = {
-  title: "Secure Property Share — EstatePro",
+  title: "Secure Property Share — RatePerFeet",
   description: "View shared property media",
 };
 
@@ -26,14 +26,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
     const description = data.property_title
       ? `Property: ${data.property_title}`
-      : "View shared property media — secured by EstatePro CRM";
+      : "View shared property media — secured by RatePerFeet CRM";
 
     return {
-      title:       `${data.title} — EstatePro`,
+      title:       `${data.title} — RatePerFeet`,
       description,
       openGraph: {
         title:       data.title,
-        description: data.property_title ?? "Shared via EstatePro CRM",
+        description: data.property_title ?? "Shared via RatePerFeet CRM",
         type:        "website",
       },
     };

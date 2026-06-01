@@ -1,8 +1,8 @@
-// app/page.tsx — EstatePro CRM landing page
+// app/page.tsx — RatePerFeet CRM landing page
 import Link from "next/link";
 
 export const metadata = {
-  title: "EstatePro CRM — Real Estate CRM for Indian Brokers",
+  title: "RatePerFeet CRM — Real Estate CRM for Indian Brokers",
   description: "Manage properties, leads, clients and close more deals. Built for Indian real estate brokers.",
 };
 
@@ -41,7 +41,7 @@ function Navbar() {
           <div style={{ width: 32, height: 32, borderRadius: 8, background: G, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <span style={{ color: "#fff", fontSize: 16 }}>🏢</span>
           </div>
-          <span style={{ fontWeight: 800, fontSize: 18, color: DARK, letterSpacing: -0.4 }}>EstatePro</span>
+          <span style={{ fontWeight: 800, fontSize: 18, color: DARK, letterSpacing: -0.4 }}>RatePerFeet</span>
           <span style={{ fontSize: 11, fontWeight: 600, color: G, background: "#F0FDF9", border: "1px solid #BBF7D0", borderRadius: 6, padding: "2px 6px", marginLeft: 2 }}>CRM</span>
         </div>
 
@@ -249,7 +249,7 @@ function HowItWorks() {
           Up and running in minutes
         </h2>
         <p style={{ color:MID, fontSize:17, textAlign:"center", maxWidth:480, margin:"0 auto 60px" }}>
-          No training needed. If you can use WhatsApp, you can use EstatePro.
+          No training needed. If you can use WhatsApp, you can use RatePerFeet.
         </p>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))", gap:28 }}>
           {STEPS.map(s=>(
@@ -402,7 +402,7 @@ function Footer() {
               <div style={{ width:28, height:28, borderRadius:7, background:G, display:"flex", alignItems:"center", justifyContent:"center" }}>
                 <span style={{ color:"#fff", fontSize:13 }}>🏢</span>
               </div>
-              <span style={{ fontWeight:800, fontSize:16, color:"#fff" }}>EstatePro CRM</span>
+              <span style={{ fontWeight:800, fontSize:16, color:"#fff" }}>RatePerFeet CRM</span>
             </div>
             <p style={{ color:"rgba(255,255,255,0.4)", fontSize:13, maxWidth:220, lineHeight:1.6 }}>
               The complete CRM for Indian real estate brokers.
@@ -422,7 +422,7 @@ function Footer() {
           </div>
         </div>
         <div style={{ borderTop:"1px solid rgba(255,255,255,0.06)", paddingTop:20, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8 }}>
-          <p style={{ color:"rgba(255,255,255,0.25)", fontSize:12 }}>© 2026 EstatePro CRM. All rights reserved.</p>
+          <p style={{ color:"rgba(255,255,255,0.25)", fontSize:12 }}>© 2026 RatePerFeet CRM. All rights reserved.</p>
           <p style={{ color:"rgba(255,255,255,0.25)", fontSize:12 }}>Made with ❤️ for Indian brokers</p>
         </div>
       </div>

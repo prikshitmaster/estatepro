@@ -316,7 +316,7 @@ export default function SettingsPage() {
       <div className="bg-white rounded-2xl border border-gray-100 p-5">
         <h2 className="text-sm font-semibold text-gray-900 mb-3">About</h2>
         <div className="space-y-2">
-          <Row label="App" value="EstatePro CRM" />
+          <Row label="App" value="RatePerFeet CRM" />
           <Row label="Version" value="Day 12 build" />
           <Row label="Stack" value="Next.js + Supabase" />
         </div>

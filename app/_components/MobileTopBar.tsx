@@ -32,12 +32,11 @@ export default function MobileTopBar() {
     >
       {/* Logo */}
       <div className="flex items-center gap-2">
-        <div className="flex items-end gap-0.5">
-          <div style={{ width: 7, height: 16, borderRadius: 3, background: "#1BC47D" }} />
-          <div style={{ width: 7, height: 11, borderRadius: 3, background: "#1BC47D44" }} />
+        <div className="flex items-center justify-center rounded-lg shrink-0" style={{ width: 26, height: 26, background: "#1BC47D" }}>
+          <span style={{ fontSize: 10, fontWeight: 800, color: "#fff", letterSpacing: "-0.04em" }}>RPF</span>
         </div>
-        <span style={{ fontSize: 15, fontWeight: 800, color: "#fff", letterSpacing: "-0.02em", marginLeft: 4 }}>
-          EstatePro
+        <span style={{ fontSize: 15, fontWeight: 800, color: "#fff", letterSpacing: "-0.02em" }}>
+          RatePerFeet
         </span>
       </div>
 

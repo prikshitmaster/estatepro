@@ -343,7 +343,7 @@ export default function ViewerClient() {
 
           {/* Footer */}
           <p style={{ textAlign:"center", color:"rgba(255,255,255,0.18)", fontSize:10, paddingBottom:10 }}>
-            Secured by EstatePro CRM · Unauthorized sharing prohibited
+            Secured by RatePerFeet CRM · Unauthorized sharing prohibited
           </p>
         </div>
 

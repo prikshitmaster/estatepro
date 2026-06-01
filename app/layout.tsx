@@ -1,4 +1,4 @@
-// app/layout.tsx — root layout for EstatePro CRM
+// app/layout.tsx — root layout for RatePerFeet CRM
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -11,7 +11,7 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "EstatePro CRM",
+  title: "RatePerFeet CRM",
   description: "CRM for real estate brokers and agencies",
 };
 

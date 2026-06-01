@@ -13,6 +13,9 @@ import { formatPrice } from "@/lib/mock-data";
 import { Property, PropertyStatus, Lead } from "@/lib/types";
 import { matchLeadsToProperty, budgetDiff, MatchResult } from "@/lib/match-utils";
 
+const GREEN    = "#1BC47D";
+const WHATSAPP  = "#25D366";
+
 const STATUS_STYLE: Record<PropertyStatus, string> = {
   available:    "bg-green-50 text-green-700",
   sold:         "bg-gray-100 text-gray-500",
@@ -142,10 +145,41 @@ export default function PropertyDetailPage({ params }: Props) {
 
   if (loading) {
     return (
-      <div className="p-6 max-w-2xl mx-auto animate-pulse space-y-4">
-        <div className="h-8 bg-gray-200 rounded w-1/3" />
-        <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
-          {[...Array(4)].map((_, i) => <div key={i} className="h-4 bg-gray-100 rounded w-full" />)}
+      <div className="p-4 sm:p-6 max-w-2xl mx-auto pb-24 sm:pb-6 animate-pulse">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-5 h-5 rounded bg-gray-200 shrink-0" />
+          <div className="flex-1 space-y-2">
+            <div className="h-5 bg-gray-200 rounded w-2/3" />
+            <div className="h-3 bg-gray-100 rounded w-24" />
+          </div>
+          <div className="h-6 w-16 rounded-full bg-gray-100 shrink-0" />
+        </div>
+        {/* Media */}
+        <div className="aspect-[4/3] w-full rounded-2xl bg-gray-200 mb-4" />
+        {/* Price */}
+        <div className="h-20 rounded-2xl bg-gray-100 mb-4" />
+        {/* Details card */}
+        <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-100">
+          {[0, 1, 2].map((s) => (
+            <div key={s} className="p-4 space-y-3">
+              <div className="h-2.5 bg-gray-100 rounded w-24" />
+              {[0, 1].map((r) => (
+                <div key={r} className="flex items-center justify-between">
+                  <div className="h-3.5 bg-gray-100 rounded w-20" />
+                  <div className="h-3.5 bg-gray-200 rounded w-28" />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        {/* Actions */}
+        <div className="mt-5 space-y-2.5">
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="h-11 rounded-xl bg-gray-100" />
+            <div className="h-11 rounded-xl bg-gray-200" />
+          </div>
+          <div className="h-10 rounded-xl bg-gray-100" />
         </div>
       </div>
     );
@@ -263,16 +297,15 @@ export default function PropertyDetailPage({ params }: Props) {
             {property.owner_name && <Row label="Name" value={property.owner_name} />}
             {property.listed_by  && <Row label="Listed by" value={<span className="capitalize">{property.listed_by}</span>} />}
             {property.owner_phone && (
-              <div className="flex gap-2 pt-2">
+              <div className="grid grid-cols-2 gap-2 pt-3">
                 <a href={`tel:${property.owner_phone}`}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                  style={{ background: "#1BC47D" }}>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                  Call owner
+                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-800 bg-white hover:bg-gray-50 transition-colors">
+                  <svg className="w-4 h-4" style={{ color: GREEN }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                  Call
                 </a>
                 <a href={`https://wa.me/91${property.owner_phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer"
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                  style={{ background: "#25D366" }}>
+                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                  style={{ background: WHATSAPP }}>
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.96 9.96 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
                   WhatsApp
                 </a>
@@ -357,56 +390,65 @@ export default function PropertyDetailPage({ params }: Props) {
         </div>
       )}
 
-      {/* Action buttons */}
-      <div className="mt-5 flex flex-col gap-3">
-        <Link
-          href={`/properties/${property.id}/edit`}
-          className="w-full py-3 text-center text-white text-sm font-semibold rounded-xl transition-colors"
-          style={{ background: '#1BC47D' }}
-        >
-          Edit Property
-        </Link>
+      {/* ── Actions — one primary (Share), rest are quiet ── */}
+      <div className="mt-5 space-y-2.5">
 
-        <a
-          href={`https://wa.me/?text=${encodeURIComponent(buildWhatsAppMessage(property))}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full py-3 text-center text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2"
-          style={{ background: '#25D366' }}
-        >
-          <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white flex-shrink-0">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-            <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.534 5.856L.057 23.882a.5.5 0 0 0 .612.612l6.074-1.485A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.907 0-3.694-.504-5.24-1.385l-.373-.214-3.862.945.963-3.79-.234-.38A9.96 9.96 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
-          </svg>
-          Share on WhatsApp
-        </a>
+        {/* Primary row: Edit (secondary) + Share (primary) */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <Link
+            href={`/properties/${property.id}/edit`}
+            className="flex items-center justify-center gap-1.5 py-3 rounded-xl text-sm font-semibold border border-gray-200 text-gray-800 bg-white hover:bg-gray-50 transition-colors"
+          >
+            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Edit
+          </Link>
 
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(buildWhatsAppMessage(property))}`}
+            target="_blank" rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 py-3 rounded-xl text-white text-sm font-semibold transition-opacity hover:opacity-90"
+            style={{ background: WHATSAPP }}
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white flex-shrink-0">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+              <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.534 5.856L.057 23.882a.5.5 0 0 0 .612.612l6.074-1.485A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.907 0-3.694-.504-5.24-1.385l-.373-.214-3.862.945.963-3.79-.234-.38A9.96 9.96 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+            </svg>
+            Share
+          </a>
+        </div>
+
+        {/* Secure share link — quiet secondary */}
         <Link
           href={`/secure-share/create?propertyId=${property.id}&title=${encodeURIComponent(property.title)}`}
-          className="w-full py-3 text-center text-sm font-semibold rounded-xl transition-colors"
-          style={{ background: '#6366F118', color: '#6366F1', border: '1px solid #6366F140' }}
+          className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
         >
-          🔗 Create Secure Share Link
+          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+          </svg>
+          Create secure share link
         </Link>
 
+        {/* Delete — lowest emphasis */}
         {!confirmDelete ? (
           <button
             onClick={() => setConfirmDelete(true)}
-            className="w-full py-3 border border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-500 text-sm font-medium rounded-xl transition-colors"
+            className="w-full py-2 text-xs font-medium text-gray-400 hover:text-red-500 transition-colors"
           >
-            Delete Property
+            Delete property
           </button>
         ) : (
           <div className="rounded-xl border border-red-200 bg-red-50 p-4">
             <p className="text-sm text-red-700 font-medium mb-3">
-              ⚠️ Are you sure? This will permanently delete <strong>{property.title}</strong>.
+              Delete <strong>{property.title}</strong>? This can&apos;t be undone.
             </p>
             <div className="flex gap-2">
               <button
                 onClick={handleDelete} disabled={deleting}
                 className="flex-1 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white text-sm font-semibold rounded-lg transition-colors"
               >
-                {deleting ? "Deleting..." : "Yes, delete"}
+                {deleting ? "Deleting…" : "Yes, delete"}
               </button>
               <button
                 onClick={() => setConfirmDelete(false)}
@@ -592,7 +634,7 @@ function buildWhatsAppMessage(p: Property): string {
     lines.push("");
   }
 
-  lines.push("_Sent via EstatePro CRM_");
+  lines.push("_Sent via RatePerFeet CRM_");
   return lines.join("\n");
 }
 
@@ -624,7 +666,7 @@ function LeadMatchCard({
   const borderColor = tier === "perfect" ? "#BFDBFE" : "#FDE68A";
 
   const waMsg = encodeURIComponent(
-    `Hi ${lead.name}! 👋\n\nI have a property that matches your requirement:\n\n🏢 *${property.title}*\n📍 ${property.location}\n💰 *${formatPrice(property.price)}*\n\nWould you like to schedule a visit?\n\n_Sent via EstatePro CRM_`
+    `Hi ${lead.name}! 👋\n\nI have a property that matches your requirement:\n\n🏢 *${property.title}*\n📍 ${property.location}\n💰 *${formatPrice(property.price)}*\n\nWould you like to schedule a visit?\n\n_Sent via RatePerFeet CRM_`
   );
 
   return (

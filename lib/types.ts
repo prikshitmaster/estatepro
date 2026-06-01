@@ -1,4 +1,4 @@
-// lib/types.ts — shared TypeScript types for EstatePro CRM
+// lib/types.ts — shared TypeScript types for RatePerFeet CRM
 
 export type LeadStage = "new" | "contacted" | "viewing" | "negotiating" | "closed" | "lost";
 

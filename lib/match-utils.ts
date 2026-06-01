@@ -1,7 +1,7 @@
 // lib/match-utils.ts
 //
 // 🧠 WHAT THIS FILE DOES (simple explanation):
-//    This is the "matchmaking brain" of EstatePro.
+//    This is the "matchmaking brain" of RatePerFeet.
 //    It matches leads to properties using 3 rules: budget, location, type.
 //
 //    TWO TIERS of matching:

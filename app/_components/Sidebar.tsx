@@ -89,12 +89,11 @@ export default function Sidebar() {
     >
       {/* ── Logo ── */}
       <div className="flex items-center gap-2.5 px-4 py-5" style={{ borderBottom: "1px solid #1F2937" }}>
-        <div className="flex items-end gap-0.5 shrink-0">
-          <div style={{ width: 8, height: 18, borderRadius: 3, background: "#1BC47D" }} />
-          <div style={{ width: 8, height: 12, borderRadius: 3, background: "#1BC47D44" }} />
+        <div className="flex items-center justify-center rounded-lg shrink-0" style={{ width: 28, height: 28, background: "#1BC47D" }}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", letterSpacing: "-0.04em" }}>RPF</span>
         </div>
         <span className="font-extrabold tracking-tight text-white" style={{ fontSize: 15, letterSpacing: "-0.02em" }}>
-          EstatePro
+          RatePerFeet
         </span>
       </div>
 
