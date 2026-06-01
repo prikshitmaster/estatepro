@@ -28,9 +28,24 @@ body {
 ::-webkit-scrollbar-thumb { background: #D1D8E4; border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: #B8C0CC; }
 
-/* Safe area padding for iPhone notch/home indicator */
+/* Safe area padding for iPhone notch / Android status bar / home indicator */
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+/* Mobile top bar: dark fill behind the status bar + content below it */
+.mobile-header-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+  min-height: calc(54px + env(safe-area-inset-top, 0px));
+}
+/* Floating "+" action button — sits above the bottom nav + Android gesture bar */
+.fab-position {
+  bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 768px) {
+  .fab-position { bottom: 1.5rem; }
 }
 
 /* Fade-up animation for panels */

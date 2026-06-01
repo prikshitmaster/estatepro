@@ -27,8 +27,8 @@ export default function MobileTopBar() {
 
   return (
     <header
-      className="sticky top-0 z-40 flex items-center justify-between px-4 md:hidden"
-      style={{ height: 54, background: "#111827", borderBottom: "1px solid #1F2937" }}
+      className="sticky top-0 z-40 flex items-center justify-between px-4 md:hidden mobile-header-safe"
+      style={{ background: "#111827", borderBottom: "1px solid #1F2937" }}
     >
       {/* Logo */}
       <div className="flex items-center gap-2">

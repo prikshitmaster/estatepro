@@ -65,7 +65,7 @@ export default function SignupPage() {
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#F5F7FA" }}>
+    <div className="min-h-screen flex items-start sm:items-center justify-center px-4 py-8 overflow-y-auto safe-area-top" style={{ background: "#F5F7FA" }}>
       <div className="w-full max-w-md">
 
         {/* Logo */}

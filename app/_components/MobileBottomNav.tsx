@@ -1,6 +1,7 @@
 // app/_components/MobileBottomNav.tsx — fixed bottom tab bar for mobile
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -12,37 +13,88 @@ const mainTabs = [
 
 const moreItems = [
   { label: "Auto Capture",   href: "/auto-capture", icon: CaptureIcon   },
+  { label: "Action Plans",   href: "/action-plans", icon: ActionPlanIcon},
   { label: "Site Visits",    href: "/visits",       icon: CalendarIcon  },
+  { label: "Tasks",          href: "/tasks",        icon: TasksIcon     },
   { label: "Commission",     href: "/deals",        icon: CoinIcon      },
+  { label: "Clients",        href: "/clients",      icon: ClientIcon    },
   { label: "Property Links", href: "/secure-share", icon: LinkIcon      },
   { label: "Newspaper Leads",href: "/newspaper",    icon: NewsIcon      },
+  { label: "Message Tools",  href: "/ai-tools",     icon: MsgIcon       },
   { label: "Reports",        href: "/analytics",    icon: ChartIcon     },
   { label: "Settings",       href: "/settings",     icon: SettingsIcon  },
 ];
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const moreActive = moreItems.some(({ href }) => pathname === href || pathname.startsWith(href + "/"));
 
   return (
-    <nav
-      className="fixed bottom-0 left-0 right-0 z-40 flex safe-area-bottom sm:hidden"
-      style={{ background: "#fff", borderTop: "1px solid #EEF1F6" }}
-    >
-      {mainTabs.map(({ label, href, icon: Icon }) => {
-        const active = pathname === href || pathname.startsWith(href + "/");
-        return (
-          <Link
-            key={href}
-            href={href}
-            className="flex flex-col items-center justify-center flex-1 py-2 gap-0.5 transition-colors"
-            style={{ color: active ? "#1BC47D" : "#9CA3AF" }}
+    <>
+      {/* ── Slide-up "More" sheet ── */}
+      {moreOpen && (
+        <div className="fixed inset-0 z-50 sm:hidden" onClick={() => setMoreOpen(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="absolute left-0 right-0 bottom-0 bg-white rounded-t-2xl safe-area-bottom animate-fade-up"
+            style={{ boxShadow: "0 -8px 30px rgba(0,0,0,0.15)" }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <Icon active={active} />
-            <span style={{ fontSize: 10, fontWeight: active ? 600 : 500 }}>{label}</span>
-          </Link>
-        );
-      })}
-    </nav>
+            <div className="flex items-center justify-between px-5 pt-4 pb-2">
+              <p className="text-sm font-bold text-gray-900">All tools</p>
+              <button onClick={() => setMoreOpen(false)} className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-1 px-3 pb-5">
+              {moreItems.map(({ label, href, icon: Icon }) => {
+                const active = pathname === href || pathname.startsWith(href + "/");
+                return (
+                  <Link key={href} href={href} onClick={() => setMoreOpen(false)}
+                    className="flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl transition-colors active:bg-gray-50"
+                    style={{ color: active ? "#1BC47D" : "#374151" }}>
+                    <Icon active={active} />
+                    <span style={{ fontSize: 11, fontWeight: 500, textAlign: "center", lineHeight: 1.2 }}>{label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-40 flex safe-area-bottom sm:hidden"
+        style={{ background: "#fff", borderTop: "1px solid #EEF1F6" }}
+      >
+        {mainTabs.map(({ label, href, icon: Icon }) => {
+          const active = pathname === href || pathname.startsWith(href + "/");
+          return (
+            <Link
+              key={href}
+              href={href}
+              className="flex flex-col items-center justify-center flex-1 py-2 gap-0.5 transition-colors"
+              style={{ color: active ? "#1BC47D" : "#9CA3AF" }}
+            >
+              <Icon active={active} />
+              <span style={{ fontSize: 10, fontWeight: active ? 600 : 500 }}>{label}</span>
+            </Link>
+          );
+        })}
+
+        {/* More tab — opens the sheet with everything else */}
+        <button
+          onClick={() => setMoreOpen(true)}
+          className="flex flex-col items-center justify-center flex-1 py-2 gap-0.5 transition-colors"
+          style={{ color: moreActive || moreOpen ? "#1BC47D" : "#9CA3AF", background: "transparent", border: "none" }}
+        >
+          <MoreIcon active={moreActive || moreOpen} />
+          <span style={{ fontSize: 10, fontWeight: moreActive ? 600 : 500 }}>More</span>
+        </button>
+      </nav>
+    </>
   );
 }
 
