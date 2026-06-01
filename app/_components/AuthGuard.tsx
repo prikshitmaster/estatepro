@@ -25,29 +25,34 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    // Ask Supabase: "is there an active session (logged-in user) right now?"
+    let mounted = true;
+
+    // Initial check — getSession() waits for the client to load the saved
+    // session from storage (native storage inside the app), so this is reliable
+    // even right after the app reopens.
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        // No session = not logged in → kick them to the login page
+      if (!mounted) return;
+      if (session) setChecking(false);
+      else router.replace("/login");
+    });
+
+    // React to real auth changes. IMPORTANT: only redirect on an EXPLICIT
+    // sign-out. We must NOT redirect on every "no session" event, because the
+    // session is momentarily null during init / token refresh — doing so would
+    // log the user out for no reason when they reopen the app.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+      if (event === "SIGNED_OUT") {
         router.replace("/login");
-      } else {
-        // Session found = logged in → stop loading, show the dashboard
+      } else if (session) {
+        // SIGNED_IN / TOKEN_REFRESHED / INITIAL_SESSION with a valid session
         setChecking(false);
       }
     });
 
-    // Also watch for sign-out events (e.g., user signs out in another browser tab)
-    // This ensures the current tab also redirects to login immediately
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_OUT" || !session) {
-        router.replace("/login");
-      }
-    });
-
-    // Cleanup: stop listening when this component is removed from the page
-    return () => subscription.unsubscribe();
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, [router]);
 
   // While we are still checking — show a full-screen loading spinner
@@ -57,13 +62,14 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-3">
           {/* App logo */}
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600">
-            <span className="text-white font-bold text-xl">E</span>
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl" style={{ background: "#1BC47D" }}>
+            <span className="text-white font-bold text-sm tracking-tight">RPF</span>
           </div>
           {/* Spinner */}
           <div className="flex items-center gap-2 text-gray-500 text-sm">
             <svg
-              className="animate-spin h-4 w-4 text-blue-600"
+              className="animate-spin h-4 w-4"
+              style={{ color: "#1BC47D" }}
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
