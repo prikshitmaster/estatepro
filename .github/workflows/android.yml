@@ -31,6 +31,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest # GitHub's free Linux machine (has the Android SDK)
+    permissions:
+      contents: write # needed to publish the APK as a GitHub Release
     steps:
       - name: Get the code
         uses: actions/checkout@v4
@@ -89,12 +91,32 @@ jobs:
           cd android
           ./gradlew assembleDebug --no-daemon
 
-      - name: Upload the APK so you can download it
+      - name: Upload the APK as a workflow artifact (zipped — for desktop use)
         uses: actions/upload-artifact@v4
         with:
           name: RatePerFeet-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      # ── Publish the RAW .apk as a GitHub Release ──────────────────────────────
+      # 🧠 WHY: Workflow artifacts are always downloaded as a .zip, so tapping
+      # them on a phone says "file format not supported". A Release asset is the
+      # raw app-debug.apk, so the download link installs directly on any phone.
+      #
+      # 📲 PERMANENT DOWNLOAD LINK (share this / put in apk-version.json):
+      #   https://github.com/prikshitmaster/estatepro/releases/download/android-latest/app-debug.apk
+      - name: Publish APK as a GitHub Release (direct install link)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: RatePerFeet Android — latest
+          body: |
+            Latest RatePerFeet Android app.
+
+            📲 To install: download **app-debug.apk** below, open it on your phone,
+            and allow "install from unknown sources" if asked.
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+          make_latest: true
 
       # 🔔 REMINDER: after distributing a new APK to users, bump the version
       # in public/apk-version.json (version + download_url) and push to main.

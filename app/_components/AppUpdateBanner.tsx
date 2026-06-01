@@ -53,8 +53,16 @@ export default function AppUpdateBanner() {
 
         // The version the user currently has installed (saved after they tap Update)
         const installedStr = localStorage.getItem(STORAGE_KEY);
-        const installed    = installedStr ? parseInt(installedStr, 10) : 0;
 
+        // First run on this install — remember the current version silently so we
+        // don't nag a user who JUST installed. The banner only appears later when
+        // apk-version.json's version is bumped above what they have.
+        if (!installedStr) {
+          localStorage.setItem(STORAGE_KEY, String(latest.version));
+          return;
+        }
+
+        const installed = parseInt(installedStr, 10);
         if (latest.version > installed) {
           setInfo(latest);
           setVisible(true);
