@@ -2,6 +2,7 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import DeepLinkHandler from "./_components/DeepLinkHandler";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -31,6 +32,8 @@ export default function RootLayout({
     <html lang="en" className={`${jakarta.variable} h-full`}>
       <body className="min-h-full bg-[#F5F7FA] font-sans antialiased">
         {children}
+        {/* Catches OAuth deep-links inside the Android app and sets the session */}
+        <DeepLinkHandler />
         <SpeedInsights />
       </body>
     </html>

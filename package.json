@@ -12,6 +12,7 @@
     "cap:sync": "cap sync android"
   },
   "dependencies": {
+    "@capacitor/app": "^7.1.2",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@supabase/supabase-js": "^2.105.0",
