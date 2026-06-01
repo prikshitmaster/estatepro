@@ -27,7 +27,12 @@ export default function SignupPage() {
       : `${window.location.origin}/auth/callback`;
     const { error: e } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo },
+      options: {
+        redirectTo,
+        // Always show Google's "choose an account" screen so users with
+        // multiple Google accounts can pick which email to sign up with.
+        queryParams: { prompt: "select_account" },
+      },
     });
     if (e) { setError(e.message); setGoogleLoading(false); }
   }
