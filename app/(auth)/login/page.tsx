@@ -17,9 +17,15 @@ export default function LoginPage() {
   async function handleGoogle() {
     setError("");
     setGoogleLoading(true);
+    // Inside the Capacitor app, use the custom deep-link scheme so Android routes
+    // the OAuth callback back INTO the app instead of opening a browser tab.
+    const inApp = !!(window as unknown as Record<string, unknown>).Capacitor;
+    const redirectTo = inApp
+      ? "com.rateperfeet.app://auth/callback"
+      : `${window.location.origin}/auth/callback`;
     const { error: e } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo },
     });
     if (e) { setError(e.message); setGoogleLoading(false); }
   }

@@ -68,12 +68,20 @@ jobs:
       #   READ_MEDIA_IMAGES   → pick photos from gallery for property listings
       #   READ_MEDIA_VIDEO    → pick videos from gallery
       #   READ_EXTERNAL_STORAGE (≤ API 32 / Android 12) → same as above, older phones
-      - name: Add permissions to AndroidManifest.xml
+      - name: Patch AndroidManifest.xml — permissions + OAuth deep-link
         run: |
           MANIFEST=android/app/src/main/AndroidManifest.xml
+
+          # 1. Inject permissions before </manifest>
           sed -i 's|</manifest>|    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.READ_CONTACTS" />\n    <uses-permission android:name="android.permission.WRITE_CONTACTS" />\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n</manifest>|' $MANIFEST
-          echo "✅ Permissions added:"
-          grep "uses-permission" $MANIFEST
+
+          # 2. Add the OAuth deep-link intent-filter inside the main activity so
+          #    Android routes com.rateperfeet.app://auth/callback back into the app
+          #    after Google OAuth instead of opening a browser tab.
+          sed -i 's|</activity>|        <intent-filter android:label="oauth_callback">\n            <action android:name="android.intent.action.VIEW" />\n            <category android:name="android.intent.category.DEFAULT" />\n            <category android:name="android.intent.category.BROWSABLE" />\n            <data android:scheme="com.rateperfeet.app" />\n        </intent-filter>\n    </activity>|' $MANIFEST
+
+          echo "✅ Manifest patched:"
+          grep -E "uses-permission|intent-filter|scheme" $MANIFEST
 
       - name: Build the debug APK
         run: |

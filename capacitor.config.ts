@@ -28,6 +28,15 @@ const config: CapacitorConfig = {
     cleartext: false,
   },
 
+  plugins: {
+    // Allow Supabase OAuth to redirect back into the app via deep-link.
+    // Google sends the user to com.rateperfeet.app://auth/callback after sign-in,
+    // and Android routes that URL back here instead of opening a browser tab.
+    CapacitorApp: {
+      appUrlOpen: "com.rateperfeet.app://",
+    },
+  },
+
   android: {
     // Show a brief splash/background while the site loads.
     backgroundColor: "#1BC47D",

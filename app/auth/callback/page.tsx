@@ -47,8 +47,8 @@ export default function AuthCallbackPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center">
         {/* App logo */}
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600 mb-4">
-          <span className="text-white font-bold text-xl">E</span>
+        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-4" style={{ background: "#1BC47D" }}>
+          <span className="text-white font-bold text-sm tracking-tight">RPF</span>
         </div>
         {/* Spinner */}
         <div className="flex items-center justify-center gap-2 text-gray-500 text-sm">
