@@ -71,3 +71,8 @@ jobs:
           name: RatePerFeet-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      # 🔔 REMINDER: after distributing a new APK to users, bump the version
+      # in public/apk-version.json (version + download_url) and push to main.
+      # The in-app update banner reads that file — installed apps will then show
+      # "App update available → Update" within minutes of your push.

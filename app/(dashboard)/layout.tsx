@@ -3,10 +3,15 @@ import TopNav from "../_components/TopNav";
 import MobileTopBar from "../_components/MobileTopBar";
 import MobileBottomNav from "../_components/MobileBottomNav";
 import QuickAction from "../_components/QuickAction";
+import AppUpdateBanner from "../_components/AppUpdateBanner";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
+      {/* In-app APK update banner — only shows inside the Android app when a
+          newer APK is available. Invisible in the browser. */}
+      <AppUpdateBanner />
+
       <div className="flex flex-col min-h-screen bg-[#F8FAFC]">
         {/* Desktop top nav — hidden on mobile */}
         <TopNav />
